@@ -110,6 +110,12 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 /* 追加ボタン */
 .fab{position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:20;border:0;background:var(--amber);color:#fff;font-weight:900;font-family:var(--f-head);font-size:15px;border-radius:999px;padding:14px 20px;box-shadow:var(--shadow)}
 main{padding-bottom:24px}
+.howto{margin:2px 2px 10px;font-size:13px;color:var(--muted)}
+.tabs .seg{grid-template-columns:repeat(2,1fr)}
+.at-pill{color:var(--road);background:var(--surface)}
+.none-pill{color:var(--muted);background:var(--surface)}
+.at-box{display:flex;flex-direction:column;gap:8px;margin:16px 0 6px}
+.at-go{display:block;text-align:center;text-decoration:none;color:#fff}
 .edit-foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding-block:8px 120px;font-size:13px;color:var(--muted)}
 .edit-foot .btn{color:var(--muted)}
 
@@ -311,8 +317,7 @@ function render(){
   var du=daysUntil(s.date);
   var html='';
   html+='<header class="band"><div class="wrap">'
-    +'<div class="row"><div><div class="org">さいたまYEG　キャラバン部会</div><h1>キャラバン予定表</h1></div>'
-    +'<button class="me-chip" data-act="me">'+(state.me?'👤 '+esc(state.me.name):'👤 自分の名前を設定')+'</button></div>'
+    +'<div class="row"><div><div class="org">さいたまYEG　キャラバン部会</div><h1>キャラバン予定表</h1></div></div>'
     +'<div class="count"><span class="lbl">'+esc(s.title||'第45回リーダーズ研修会「彩り紡ぐさいたま会議」')+' まで</span>'
     +'<span class="days num">あと'+(du==null?'◯':du)+'日</span>'
     +'<span class="sub">'+(s.date?esc(jdate(s.date,true))+' 開催':'開催日は調整中')+'</span></div>'
@@ -325,9 +330,10 @@ function render(){
       +'<div style="min-width:0"><div class="eyebrow">次のキャラバン</div><div class="t">'+esc(next.title)+'</div><div class="m">'+esc(placeText(next)||'場所は確認中')+'</div></div>'
       +'<div class="left">'+(dn===0?'<b>今日</b>':'あと<b class="num">'+dn+'</b>日')+'</div></button></section>';
   }
+  if(state.tab!=='list') state.tab='cal';
   html+='<nav class="tabs"><div class="wrap"><div class="seg" role="tablist">'
-    +tabBtn('cal','カレンダー')+tabBtn('list','一覧')+tabBtn('mine','自分の予定')+'</div></div></nav>';
-  html+='<main class="wrap">'+(state.tab==='cal'?calView():state.tab==='list'?listView(false):mineView())+'</main>';
+    +tabBtn('cal','カレンダー')+tabBtn('list','一覧')+'</div></div></nav>';
+  html+='<main class="wrap"><p class="howto">日付やキャラバンを押すと、E-DESK（AT）のページに進めます。詳細・出欠はATで確認してください。</p>'+(state.tab==='cal'?calView():listView(false))+'</main>';
   html+='<footer class="wrap edit-foot">'+(isEditor()
     ?'<span>✏️ このスマホは編集モードです（予定の追加・修正・削除ができます）</span><button class="btn small" data-act="editoff">編集モードを終わる</button>'
     :'<button class="btn small" data-act="editmode">予定を追加・修正する担当者はこちら</button>')+'</footer>';
@@ -356,12 +362,12 @@ function calView(){
     var cls='day'+(out?' out':'')+(d.getDay()===0?' sun':d.getDay()===6?' sat':'')+(+d===+today?' today':'')+(evs.length&&!out?' has':'');
     if(out){h+='<div class="'+cls+'"></div>';continue}
     h+='<'+(evs.length?'button data-day="'+key+'"':'div')+' class="'+cls+'"'+(evs.length?' aria-label="'+(d.getMonth()+1)+'月'+d.getDate()+'日 キャラバン'+evs.length+'件"':'')+'><span class="n num">'+d.getDate()+'</span>';
-    evs.slice(0,2).forEach(function(e){h+='<span class="chip'+(isMine(e.id)?' mine':'')+'" style="background:'+tcolor(e.transport)+(e.status==='中止'?';opacity:.45;text-decoration:line-through':'')+'">'+esc(e.title)+'</span>'});
+    evs.slice(0,2).forEach(function(e){h+='<span class="chip" style="background:'+(e.status==='確定'?'var(--road)':'var(--t-other)')+(e.status==='中止'?';opacity:.45;text-decoration:line-through':'')+'">'+esc(e.title)+'</span>'});
     if(evs.length>2)h+='<span class="chip" style="background:var(--muted)">他'+(evs.length-2)+'件</span>';
     h+='</'+(evs.length?'button':'div')+'>';
   }
   h+='</div>';
-  h+='<div class="legend">'+TRANSPORTS.slice(0,5).map(function(t){return '<span><i style="background:'+tcolor(t)+'"></i>'+t+'</span>'}).join('')+'<span><i style="background:var(--t-other)"></i>未定</span><span><i style="background:transparent;box-shadow:inset 0 0 0 2px var(--amber)"></i>自分が行く</span></div>';
+  h+='<div class="legend"><span><i style="background:var(--road)"></i>確定</span><span><i style="background:var(--t-other)"></i>確認中</span></div>';
   var mS=ymd(new Date(y,mo,1)), mE=ymd(new Date(y,mo+1,0));
   var evsMonth=sortedEvents().filter(function(e){return e.date<=mE&&lastDay(e)>=mS});
   h+='<div class="month-label">この月のキャラバン（'+evsMonth.length+'件）</div>';
@@ -373,19 +379,13 @@ function calView(){
   return h;
 }
 function card(e){
-  var ps=partsOf(e.id), tgt=parseInt(e.target,10)||0, past=isPast(e);
-  var tr=e.transport||'未定';
-  var h='<button class="card'+(past?' past':'')+'" data-open="'+esc(e.id)+'">'+dateBox(e.date)+'<div class="body">'
+  var past=isPast(e), at=atUrl(e);
+  return '<button class="card'+(past?' past':'')+'" data-open="'+esc(e.id)+'">'+dateBox(e.date)+'<div class="body">'
     +'<div class="badges"><span class="pill st-'+esc(e.status||'確認中')+'">'+esc(e.status||'確認中')+'</span>'
-    +'<span class="pill solid" style="background:'+tcolor(tr)+'">'+TICON[tr]+' '+esc(tr)+'</span>'
-    +(isMine(e.id)?'<span class="pill mine-pill">自分も行く</span>':'')+'</div>'
+    +(at?'<span class="pill at-pill">AT あり</span>':'<span class="pill none-pill">ATリンク未登録</span>')+'</div>'
     +'<div class="t">'+esc(e.title)+'</div>'
-    +'<div class="meta">'+(lastDay(e)!==e.date?'<span class="num">📅 '+esc(dateText(e))+'</span>':'')+'<span>📍 '+esc(placeText(e)||'場所は確認中')+'</span>'
-    +(e.start?'<span class="num">🕐 '+esc(e.start)+(e.end?'〜'+esc(e.end):'')+'</span>':'')
-    +(tr==='キャラバンカー'&&e.meetTime?'<span class="num">🚐 '+esc(e.meetTime)+' '+esc(e.meetPlace||'')+'集合</span>':'')+'</div>'
-    +'<div class="bar-row"><span class="num">参加 '+ps.length+(tgt?' / 目標'+tgt:'')+'人</span>'+(tgt?'<div class="bar"><i style="width:'+Math.min(100,Math.round(ps.length/tgt*100))+'%"></i></div>':'')+'</div>'
+    +'<div class="meta">'+(lastDay(e)!==e.date?'<span class="num">📅 '+esc(dateText(e))+'</span>':'')+'<span>📍 '+esc(placeText(e)||'場所は確認中')+'</span></div>'
     +'</div></button>';
-  return h;
 }
 function listView(onlyMine){
   var evs=sortedEvents();
@@ -429,11 +429,26 @@ function sheetTop(title,sub){return '<div class="sheet-top"><div style="min-widt
 
 function detailView(id){
   var e=(state.data.events||[]).filter(function(x){return x.id===id})[0]; if(!e) return '';
+  var du=daysUntil(e.date), at=atUrl(e);
+  var h=sheetTop(esc(e.title),'<div class="badges" style="margin-top:2px"><span class="pill st-'+esc(e.status||'確認中')+'">'+esc(e.status||'確認中')+'</span></div>');
+  h+='<div class="big-date">'+esc(dateText(e,true))+(du!=null?' <span style="font-size:14px;color:var(--muted);font-weight:700">'+(du>0?'あと'+du+'日':du===0?'今日':isPast(e)?'終了':'開催中')+'</span>':'')+'</div>';
+  h+='<div class="m" style="color:var(--muted);margin-top:4px">📍 '+esc(placeText(e)||'場所は確認中')+'</div>';
+  h+='<div class="at-box">'+(at
+      ?'<a class="btn go at-go" href="'+esc(at)+'" target="_blank" rel="noopener">E-DESK（AT）で詳細・出欠を見る ↗</a>'
+        +'<div class="foot">集合時間・おすすめの電車・費用・出欠は、すべてATに載っています。開かないときは、E-DESKにログインしてからもう一度押してください。</div>'
+      :'<div class="none">このキャラバンのATリンクは、まだ登録されていません。E-DESKのスケジュールで確認してください。</div>'
+        +'<a class="btn" href="https://edesk.jp/atp4/Dashboard.do" target="_blank" rel="noopener">E-DESKを開く ↗</a>')
+    +'</div>';
+  h+='<div class="sec"><div class="actions">'+(isEditor()?'<button class="btn primary" data-act="edit">✏️ 編集する</button>':'')+'<a class="btn" href="'+esc(gcalUrl(e))+'" target="_blank" rel="noopener" style="text-decoration:none;color:var(--fg)">📅 自分のGoogleカレンダーに入れる</a></div>'
+    +'<div class="foot">最終更新：'+esc(e.updatedBy||'')+' '+esc(e.updatedAt||'')+'</div></div>';
+  return h;
+}
+function atUrl(e){var u=String(e.url||'').trim();return /^https:\/\//.test(u)?u:''}
+function detailViewOld(id){
+  var e=(state.data.events||[]).filter(function(x){return x.id===id})[0]; if(!e) return '';
   var ps=partsOf(id), bu=ps.filter(function(p){return p.group!=='部会以外'}), ot=ps.filter(function(p){return p.group==='部会以外'});
   var tgt=parseInt(e.target,10)||0, tr=e.transport||'未定', du=daysUntil(e.date), mine=isMine(id);
-  var h=sheetTop(esc(e.title),'<div class="badges" style="margin-top:2px"><span class="pill st-'+esc(e.status||'確認中')+'">'+esc(e.status||'確認中')+'</span><span class="pill solid" style="background:'+tcolor(tr)+'">'+TICON[tr]+' '+esc(tr)+'</span>'+(mine?'<span class="pill mine-pill">自分も行く</span>':'')+'</div>');
-  h+='<div class="big-date">'+esc(dateText(e,true))+(du!=null?' <span style="font-size:14px;color:var(--muted);font-weight:700">'+(du>0?'あと'+du+'日':du===0?'今日':isPast(e)?'終了':'開催中')+'</span>':'')+'</div>';
-  h+='<div class="actions" style="margin:12px 0 14px">'+(mine?'<button class="btn" style="flex:1" data-act="leave-me">行くのをやめる</button>':'<button class="btn go" data-act="join">🙋 行きます</button>')+'</div>';
+  var h='';
   // 場所
   h+='<div class="sec"><h4>場所・内容</h4><dl class="kv">'
     +(e.host?'<dt>主催</dt><dd>'+esc(e.host)+'</dd>':'')
@@ -536,21 +551,9 @@ function editView(id,date){
     +'<div class="radios" role="radiogroup" aria-label="状態">'+STATUSES.map(function(s){return '<label><input type="radio" name="status" value="'+s+'"'+((e.status||'確認中')===s?' checked':'')+'>'+s+'</label>'}).join('')+'</div>'
     +'<div class="two">'+inp('date','日付 *','date')+inp('endDate','最終日','date','何日間かある場合だけ')+'</div>'
     +inp('title','大会名・事業名 *','text','','例：〇〇YEG創立〇周年記念式典')
-    +inp('host','主催','text','','例：〇〇商工会議所青年部')
     +'<div class="two">'+inp('venue','会場名')+inp('address','住所・市町村','text','','例：群馬県伊勢崎市')+'</div>'
-    +inp('url','案内・資料のリンク','url','案内状やホームページのURL（あれば）','https://')
+    +inp('url','E-DESK（AT）のリンク','url','E-DESKでそのキャラバンのATを開いて、アドレス欄のURLをそのまま貼り付け','https://edesk.jp/atp4/ViewScheduleDetail.do?id=…')
     +'</fieldset>';
-  h+='<fieldset><legend>時間</legend><div class="three">'+inp('arriveBy','会場到着','time','この時間までに')+inp('start','開始','time')+inp('end','終了','time')+'</div>'
-    +inp('target','目標人数','number','何人行きたいか','例：10')+'</fieldset>';
-  h+='<fieldset><legend>移動</legend><div class="radios" role="radiogroup" aria-label="移動手段">'+TRANSPORTS.map(function(t){return '<label><input type="radio" name="transport" value="'+t+'"'+((e.transport||'未定')===t?' checked':'')+'>'+TICON[t]+' '+t+'</label>'}).join('')+'</div>'
-    +'<div id="carbox"'+(e.transport==='キャラバンカー'?'':' hidden')+' style="display:flex;flex-direction:column;gap:12px">'
-    +inp('meetPlace','集合場所','text','','例：さいたま商工会議所前')
-    +'<div class="three">'+inp('meetTime','集合','time')+inp('departTime','出発','time')+inp('returnTime','帰着予定','time')+'</div></div></fieldset>';
-  h+='<fieldset><legend>かかるお金（目安）</legend><div class="two">'
-    +inp('costTravel','交通費','text','','例：なし（キャラバンカー）')+inp('costHotel','宿泊費','text','','例：なし／約8,000円')
-    +inp('costFee','登録料・懇親会費','text','','例：10,000円')+inp('costOther','その他・お小遣い','text','','例：お小遣い程度')
-    +'</div></fieldset>';
-  h+='<label for="f-memo">くわしい案内<span class="hint">書き方：「■」で見出し／「8:32 大宮 発｜はやぶさ102号」のように時刻で始まる行は時間の流れに／「・」で箇条書き／「！」で注意書き</span><textarea id="f-memo" name="memo" style="min-height:160px" placeholder="例：&#10;！名刺・記章を忘れずに&#10;■当日の流れ&#10;13:00 集合｜さいたま商工会議所前&#10;13:15 キャラバンカーで出発">'+esc(e.memo||'')+'</textarea></label>';
   h+='<div class="err" id="ferr" hidden></div>';
   h+='<div class="actions"><button class="btn primary" type="submit" style="flex:1">保存する</button>'+(id?'<button class="btn danger" type="button" data-act="del">削除</button>':'')+'</div>';
   h+='</form>';
@@ -640,7 +643,8 @@ function bindSheet(ov){
     ef.addEventListener('change',function(ev){if(ev.target.name==='transport')document.getElementById('carbox').hidden=ev.target.value!=='キャラバンカー'});
     ef.addEventListener('submit',function(ev){ev.preventDefault();var o=formObj(ef),err=document.getElementById('ferr');
       if(!o.date||!o.title){err.hidden=false;err.textContent='日付と大会名は必ず入れてください。';return}
-      if(state.sheet.id)o.id=state.sheet.id;
+      if(o.url&&!/^https:\/\//.test(o.url)){err.hidden=false;err.textContent='ATのリンクは https:// から始まるURLを貼り付けてください。';return}
+      if(state.sheet.id){var cur=(state.data.events||[]).filter(function(x){return x.id===state.sheet.id})[0]||{};o=Object.assign({},cur,o);o.id=state.sheet.id}
       var btn=ef.querySelector('[type=submit]');btn.disabled=true;btn.textContent='保存中…';
       act('saveEvent',{event:o,by:state.me?state.me.name:''},'保存しました').then(function(d){
         var saved=sortedEvents().filter(function(x){return o.id?x.id===o.id:(x.date===o.date&&x.title===o.title)}).pop();
