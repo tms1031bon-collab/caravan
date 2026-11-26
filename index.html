@@ -148,7 +148,22 @@ a{color:var(--road)}
 .cost{display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:15px}
 .cost .v{text-align:right;font-weight:700}
 .cost .k{color:var(--muted);font-size:14px}
-.memo{white-space:pre-wrap;background:var(--surface2);border-radius:10px;padding:10px 12px;font-size:14px}
+.memo{display:flex;flex-direction:column;gap:10px;font-size:15px}
+.mm-sec{background:var(--surface2);border:1px solid var(--line);border-radius:14px;padding:12px 14px 4px}
+.mm-h{font-family:var(--f-head);font-weight:900;font-size:16px;margin:0 0 10px;text-wrap:balance}
+.mm-sub{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;margin:14px 0 8px;padding-top:12px;border-top:1px dashed var(--line);font-weight:700;font-size:15px;color:var(--road)}
+.mm-h + .mm-sub{margin-top:0;padding-top:0;border-top:0}
+.mm-sub span{font-weight:400;font-size:13px;color:var(--muted)}
+.mm-tl{margin:0 0 6px}
+.mm-tl li{padding-bottom:10px}
+.mm-tl .tm{font-size:16px}
+.mm-tl .tm small{display:block;font-size:12px;color:var(--muted);font-weight:700}
+.mm-ul{margin:0 0 10px;padding-left:1.25em;display:flex;flex-direction:column;gap:4px}
+.mm-p{margin:0 0 8px}
+.mm-note{margin:0 0 8px;font-size:13px;color:var(--muted)}
+.mm-warn{margin:0;background:var(--warn-soft);border:1.5px solid var(--warn);border-radius:12px;padding:10px 12px;font-weight:700;line-height:1.5}
+.mm-warn::before{content:"⚠️ "}
+.memo a{overflow-wrap:anywhere}
 .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
 .btn{border:1.5px solid var(--line);background:var(--surface);border-radius:12px;padding:11px 16px;font-weight:700;font-size:15px}
 .btn.primary{background:var(--road);color:var(--road-fg);border-color:var(--road)}
@@ -433,9 +448,35 @@ function detailView(id){
   // お金
   var costs=[['交通費',e.costTravel],['宿泊費',e.costHotel],['登録料・懇親会費',e.costFee],['その他・お小遣い',e.costOther]].filter(function(c){return c[1]});
   h+='<div class="sec"><h4>かかるお金（目安）</h4>'+(costs.length?'<div class="cost">'+costs.map(function(c){return '<span class="k">'+c[0]+'</span><span class="v num">'+esc(c[1])+'</span>'}).join('')+'</div>':'<div class="none">まだ決まっていません。</div>')+'</div>';
-  if(e.memo) h+='<div class="sec"><h4>メモ・持ち物</h4><div class="memo">'+esc(e.memo)+'</div></div>';
+  if(e.memo) h+='<div class="sec"><h4>くわしい案内</h4><div class="memo">'+renderMemo(e.memo)+'</div></div>';
   h+='<div class="sec"><div class="actions"><button class="btn primary" data-act="edit">✏️ 編集する</button><button class="btn" data-act="copy">LINE用に文章をコピー</button><a class="btn" href="'+esc(gcalUrl(e))+'" target="_blank" rel="noopener" style="text-decoration:none;color:var(--fg)">📅 Googleカレンダーに入れる</a></div>'
     +'<div class="foot">最終更新：'+esc(e.updatedBy||'')+' '+esc(e.updatedAt||'')+'</div></div>';
+  return h;
+}
+/* くわしい案内：■見出し／【小見出し】／時刻で始まる行＝時間の流れ／・箇条書き／！注意／※補足 */
+function linkify(s){return esc(s).replace(/https?:\/\/[^\s<"'）)]+/g,function(u){return '<a href="'+u+'" target="_blank" rel="noopener">'+u.replace(/^https?:\/\//,'').replace(/\/$/,'')+' ↗</a>'})}
+function renderMemo(text){
+  var h='',tl=false,ul=false,sec=false;
+  function endList(){if(tl){h+='</ol>';tl=false}if(ul){h+='</ul>';ul=false}}
+  String(text||'').split(/\r?\n/).forEach(function(raw){
+    var l=raw.trim(),m;
+    if(!l){endList();return}
+    if(l.charAt(0)==='■'){endList();if(sec)h+='</section>';h+='<section class="mm-sec"><h5 class="mm-h">'+linkify(l.slice(1).trim())+'</h5>';sec=true;return}
+    if((m=/^【(.+?)】\s*(.*)$/.exec(l))){endList();h+='<div class="mm-sub">'+esc(m[1])+(m[2]?'<span>'+linkify(m[2])+'</span>':'')+'</div>';return}
+    if((m=/^(\d{1,2}:\d{2})(?:\s*[〜~～-]\s*(\d{1,2}:\d{2}))?\s*(.*)$/.exec(l))){
+      if(ul){h+='</ul>';ul=false}
+      if(!tl){h+='<ol class="tl mm-tl">';tl=true}
+      var parts=m[3].split('｜'),main=parts[0],sub=parts.slice(1).join('｜');
+      var key=/発$|集合|出発|PR/.test(main);
+      h+='<li><span class="tm num">'+esc(m[1])+(m[2]?'<small>〜'+esc(m[2])+'</small>':'')+'</span><span class="dot'+(key?' key':'')+'"></span><span class="what">'+linkify(main)+(sub?'<small>'+linkify(sub)+'</small>':'')+'</span></li>';
+      return}
+    if(/^[・\-]/.test(l)){if(tl){h+='</ol>';tl=false}if(!ul){h+='<ul class="mm-ul">';ul=true}h+='<li>'+linkify(l.slice(1).trim())+'</li>';return}
+    endList();
+    if(/^[!！]/.test(l)){h+='<p class="mm-warn">'+linkify(l.slice(1).trim())+'</p>';return}
+    if(/^[※＊]/.test(l)){h+='<p class="mm-note">'+linkify(l)+'</p>';return}
+    h+='<p class="mm-p">'+linkify(l)+'</p>';
+  });
+  endList();if(sec)h+='</section>';
   return h;
 }
 function names(arr,id){
@@ -494,7 +535,7 @@ function editView(id,date){
     +inp('costTravel','交通費','text','','例：なし（キャラバンカー）')+inp('costHotel','宿泊費','text','','例：なし／約8,000円')
     +inp('costFee','登録料・懇親会費','text','','例：10,000円')+inp('costOther','その他・お小遣い','text','','例：お小遣い程度')
     +'</div></fieldset>';
-  h+='<label for="f-memo">メモ・持ち物<textarea id="f-memo" name="memo" placeholder="例：名刺・バッジを忘れずに">'+esc(e.memo||'')+'</textarea></label>';
+  h+='<label for="f-memo">くわしい案内<span class="hint">書き方：「■」で見出し／「8:32 大宮 発｜はやぶさ102号」のように時刻で始まる行は時間の流れに／「・」で箇条書き／「！」で注意書き</span><textarea id="f-memo" name="memo" style="min-height:160px" placeholder="例：&#10;！名刺・記章を忘れずに&#10;■当日の流れ&#10;13:00 集合｜さいたま商工会議所前&#10;13:15 キャラバンカーで出発">'+esc(e.memo||'')+'</textarea></label>';
   h+='<div class="err" id="ferr" hidden></div>';
   h+='<div class="actions"><button class="btn primary" type="submit" style="flex:1">保存する</button>'+(id?'<button class="btn danger" type="button" data-act="del">削除</button>':'')+'</div>';
   h+='</form>';
