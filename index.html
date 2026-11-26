@@ -109,7 +109,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 
 /* 追加ボタン */
 .fab{position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:20;border:0;background:var(--amber);color:#fff;font-weight:900;font-family:var(--f-head);font-size:15px;border-radius:999px;padding:14px 20px;box-shadow:var(--shadow)}
-main{padding-bottom:110px}
+main{padding-bottom:24px}
+.edit-foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding-block:8px 120px;font-size:13px;color:var(--muted)}
+.edit-foot .btn{color:var(--muted)}
 
 /* シート（下からせり上がる） */
 .ov{position:fixed;inset:0;z-index:30;background:rgba(8,14,26,.5);display:flex;align-items:flex-end;justify-content:center}
@@ -237,34 +239,39 @@ var Mock = (function(){
   function write(d){LS.set(KEY,JSON.stringify(d))}
   function now(){var d=new Date();return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())+' '+p2(d.getHours())+':'+p2(d.getMinutes())}
   return {pin:PIN,api:function(action,pin,p){
-    if(String(pin||'').trim()!==PIN) return {error:'PIN'};
-    var d=read();
+    var editor=String(pin||'').trim()===PIN;
+    if(/^(saveEvent|deleteEvent|saveSettings|checkEdit)$/.test(action)&&!editor) return {error:'EDIT_PIN'};
+    var d=read(), token='';
+    if(action==='leave'){var row=d.participants.filter(function(x){return x.eventId===p.eventId&&x.name===p.name})[0];
+      if(row&&!editor&&(!p.token||p.token!==row.token))return {error:'自分のスマホで登録した名前だけ取り消せます。ほかの人の名前を外したいときは担当者に連絡してください'}}
+    if(action==='join'){var old=d.participants.filter(function(x){return x.eventId===p.eventId&&x.name===p.name})[0];token=(old&&old.token)||('t'+Math.random().toString(36).slice(2))}
     if(action==='saveEvent'){var e=Object.assign({},p.event);if(!e.date)return{error:'日付を入れてください'};if(!e.title)return{error:'大会名を入れてください'};
       e.updatedBy=p.by||'名前未設定';e.updatedAt=now();
       if(e.id){d.events=d.events.map(function(x){return x.id===e.id?e:x})}else{e.id='d'+Date.now();d.events.push(e)}}
     else if(action==='deleteEvent'){d.events=d.events.filter(function(x){return x.id!==p.id});d.participants=d.participants.filter(function(x){return x.eventId!==p.id})}
     else if(action==='join'){var known=d.members.filter(function(m){return m.name===p.name})[0];var g=known&&known.group==='キャラバン部会'?'キャラバン部会':p.group;
-      d.participants=d.participants.filter(function(x){return!(x.eventId===p.eventId&&x.name===p.name)});d.participants.push({eventId:p.eventId,name:p.name,group:g,at:now(),plan:p.plan||''});
+      d.participants=d.participants.filter(function(x){return!(x.eventId===p.eventId&&x.name===p.name)});d.participants.push({eventId:p.eventId,name:p.name,group:g,at:now(),plan:p.plan||'',token:token});
       if(!known)d.members.push({name:p.name,group:g,role:''})}
     else if(action==='leave'){d.participants=d.participants.filter(function(x){return!(x.eventId===p.eventId&&x.name===p.name)})}
-    write(d);return JSON.parse(JSON.stringify(d));
+    write(d);var out=JSON.parse(JSON.stringify(d));out.participants.forEach(function(x){delete x.token});out.editor=editor;if(token)out.token=token;return out;
   }};
 })();
 
 function call(action,payload){
   return new Promise(function(res,rej){
-    var done=function(r){ if(r&&r.error){ if(r.error==='PIN'){ LS.del('caravan-pin'); state.pin=''; render(); rej(new Error('合言葉が違います')); } else rej(new Error(r.error)); } else res(r); };
-    if(IS_GAS){ google.script.run.withSuccessHandler(done).withFailureHandler(function(e){rej(new Error('通信できませんでした。電波の良い所でもう一度お試しください。'))}).api(action,state.pin,payload||null); }
-    else if(API_URL){ fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:action,pin:state.pin,payload:payload||null})})
+    var done=function(r){ if(r&&r.error){ if(r.error==='EDIT_PIN'){ setEditPin(''); rej(new Error('編集用の合言葉が違います')); } else rej(new Error(r.error)); } else res(r); };
+    if(IS_GAS){ google.script.run.withSuccessHandler(done).withFailureHandler(function(e){rej(new Error('通信できませんでした。電波の良い所でもう一度お試しください。'))}).api(action,state.editPin,payload||null); }
+    else if(API_URL){ fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:action,pin:state.editPin,payload:payload||null})})
       .then(function(r){return r.json()}).then(done).catch(function(){rej(new Error('通信できませんでした。電波の良い所でもう一度お試しください。'))}); }
-    else setTimeout(function(){done(Mock.api(action,state.pin,payload))},120);
+    else setTimeout(function(){done(Mock.api(action,state.editPin,payload))},120);
   });
 }
 
 /* ---------- 状態 ---------- */
 var today=new Date(); today.setHours(0,0,0,0);
 var state={
-  pin:LS.get('caravan-pin')||'',
+  editPin:LS.get('caravan-edit-pin')||'',
+  tokens:(function(){try{return JSON.parse(LS.get('caravan-tokens')||'{}')||{}}catch(e){return {}}})(),
   me:(function(){try{return JSON.parse(LS.get('caravan-me')||'null')}catch(e){return null}})(),
   tab:LS.get('caravan-tab')||'cal',
   month:new Date(today.getFullYear(),today.getMonth(),1),
@@ -288,13 +295,17 @@ function isMine(id){return !!(state.me&&partsOf(id).some(function(p){return p.na
 function sortedEvents(){return (state.data.events||[]).slice().sort(function(a,b){return (a.date+(a.start||'')).localeCompare(b.date+(b.start||''))})}
 function tcolor(t){return TCOLOR[t]||'var(--t-other)'}
 function toast(msg){var t=document.createElement('div');t.className='toast';t.setAttribute('role','status');t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.remove()},2400)}
+function isEditor(){return !!state.editPin}
+function setEditPin(v){state.editPin=v;if(v)LS.set('caravan-edit-pin',v);else LS.del('caravan-edit-pin')}
+function tokenKey(id,name){return id+'|'+name}
+function canRemove(id,name){return isEditor()||!!state.tokens[tokenKey(id,name)]}
+function saveToken(id,name,t){if(t){state.tokens[tokenKey(id,name)]=t}else{delete state.tokens[tokenKey(id,name)]}LS.set('caravan-tokens',JSON.stringify(state.tokens))}
 function placeText(e){return [e.venue,e.address].filter(Boolean).join('　')}
 function mapUrl(e){var q=e.address||e.venue;return q?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent([e.venue,e.address].filter(Boolean).join(' ')):''}
 
 /* ---------- 描画 ---------- */
 var app=document.getElementById('app');
 function render(){
-  if(!state.pin){app.innerHTML=gateView();bindGate();return}
   if(!state.data){app.innerHTML='<div class="loading">読み込み中…</div>';return}
   var s=state.data.settings||{};
   var du=daysUntil(s.date);
@@ -317,7 +328,10 @@ function render(){
   html+='<nav class="tabs"><div class="wrap"><div class="seg" role="tablist">'
     +tabBtn('cal','カレンダー')+tabBtn('list','一覧')+tabBtn('mine','自分の予定')+'</div></div></nav>';
   html+='<main class="wrap">'+(state.tab==='cal'?calView():state.tab==='list'?listView(false):mineView())+'</main>';
-  html+='<button class="fab" data-act="add">＋ キャラバンを追加</button>';
+  html+='<footer class="wrap edit-foot">'+(isEditor()
+    ?'<span>✏️ このスマホは編集モードです（予定の追加・修正・削除ができます）</span><button class="btn small" data-act="editoff">編集モードを終わる</button>'
+    :'<button class="btn small" data-act="editmode">予定を追加・修正する担当者はこちら</button>')+'</footer>';
+  if(isEditor()) html+='<button class="fab" data-act="add">＋ キャラバンを追加</button>';
   app.innerHTML=html;
   if(state.sheet) openSheet(state.sheet,true);
 }
@@ -400,6 +414,7 @@ function openSheet(sh,silent){
   else if(sh.type==='edit') inner=editView(sh.id,sh.date);
   else if(sh.type==='join') inner=joinView(sh.id);
   else if(sh.type==='me') inner=meView();
+  else if(sh.type==='editpin') inner=editPinView();
   else if(sh.type==='del') inner=delView(sh.id);
   if(!inner){state.sheet=null;return}
   var ov=document.createElement('div'); ov.className='ov';
@@ -449,7 +464,7 @@ function detailView(id){
   var costs=[['交通費',e.costTravel],['宿泊費',e.costHotel],['登録料・懇親会費',e.costFee],['その他・お小遣い',e.costOther]].filter(function(c){return c[1]});
   h+='<div class="sec"><h4>かかるお金（目安）</h4>'+(costs.length?'<div class="cost">'+costs.map(function(c){return '<span class="k">'+c[0]+'</span><span class="v num">'+esc(c[1])+'</span>'}).join('')+'</div>':'<div class="none">まだ決まっていません。</div>')+'</div>';
   if(e.memo) h+='<div class="sec"><h4>くわしい案内</h4><div class="memo">'+renderMemo(e.memo)+'</div></div>';
-  h+='<div class="sec"><div class="actions"><button class="btn primary" data-act="edit">✏️ 編集する</button><button class="btn" data-act="copy">LINE用に文章をコピー</button><a class="btn" href="'+esc(gcalUrl(e))+'" target="_blank" rel="noopener" style="text-decoration:none;color:var(--fg)">📅 Googleカレンダーに入れる</a></div>'
+  h+='<div class="sec"><div class="actions">'+(isEditor()?'<button class="btn primary" data-act="edit">✏️ 編集する</button>':'')+'<button class="btn" data-act="copy">LINE用に文章をコピー</button><a class="btn" href="'+esc(gcalUrl(e))+'" target="_blank" rel="noopener" style="text-decoration:none;color:var(--fg)">📅 Googleカレンダーに入れる</a></div>'
     +'<div class="foot">最終更新：'+esc(e.updatedBy||'')+' '+esc(e.updatedAt||'')+'</div></div>';
   return h;
 }
@@ -481,7 +496,7 @@ function renderMemo(text){
 }
 function names(arr,id){
   if(!arr.length) return '<div class="none">まだいません</div>';
-  return '<div class="names">'+arr.map(function(p){var me=state.me&&p.name===state.me.name;return '<span class="name'+(me?' me':'')+'">'+esc(p.name)+(p.plan&&p.plan!=='未定'?'<small class="plan">'+esc(p.plan)+'</small>':'')+'<button data-leave="'+esc(p.name)+'" aria-label="'+esc(p.name)+'さんを外す">×</button></span>'}).join('')+'</div>';
+  return '<div class="names">'+arr.map(function(p){var me=state.me&&p.name===state.me.name;return '<span class="name'+(me?' me':'')+'">'+esc(p.name)+(p.plan&&p.plan!=='未定'?'<small class="plan">'+esc(p.plan)+'</small>':'')+(canRemove(id,p.name)?'<button data-leave="'+esc(p.name)+'" aria-label="'+esc(p.name)+'さんを外す">×</button>':'')+'</span>'}).join('')+'</div>';
 }
 function gcalUrl(e){
   var d=pd(e.date); if(!d) return '#';
@@ -582,21 +597,16 @@ function bindPicker(f){
   if(f.other) f.other.addEventListener('input',function(){if(f.other.value)Array.prototype.forEach.call(f.querySelectorAll('[name=pick]'),function(r){r.checked=false})});
 }
 
-/* ---------- 合言葉 ---------- */
-function gateView(){
-  return '<div class="wrap gate"><form class="box" id="gf" novalidate><div class="org" style="font-size:13px;color:var(--muted);font-weight:700">さいたまYEG　キャラバン部会</div><h2>キャラバン予定表</h2>'
-    +'<label for="g-pin">合言葉<input id="g-pin" name="pin" inputmode="numeric" autocomplete="off" placeholder="委員会で共有された合言葉"></label>'
-    +(LIVE?'':'<div class="demo-note">見本の合言葉は <b>'+Mock.pin+'</b> です。</div>')
-    +'<div class="err" id="gerr" hidden></div><button class="btn primary" type="submit">開く</button>'
-    +'<div class="foot">一度入れると、この端末では次から入力不要です。</div></form></div>';
+/* ---------- 編集用の合言葉（予定の追加・修正・削除をする人だけ） ---------- */
+function editPinView(){
+  return sheetTop('予定を追加・修正する人へ')
+    +'<form id="pf" novalidate><p style="margin:0">予定の追加・修正・削除は、<b>編集用の合言葉</b>を知っている担当者だけができます。見るだけ・「行きます」の登録には合言葉はいりません。</p>'
+    +'<label for="p-pin">編集用の合言葉<input id="p-pin" name="pin" inputmode="numeric" autocomplete="off" placeholder="担当者に共有された合言葉"></label>'
+    +(LIVE?'':'<div class="demo-note">見本の編集用合言葉は <b>'+Mock.pin+'</b> です。</div>')
+    +'<div class="err" id="perr" hidden></div><div class="actions"><button class="btn primary" type="submit" style="flex:1">編集できるようにする</button></div>'
+    +'<div class="foot">一度入れると、このスマホでは次から入力不要です。</div></form>';
 }
-function bindGate(){
-  var f=document.getElementById('gf');
-  f.addEventListener('submit',function(ev){ev.preventDefault();var v=f.pin.value.trim();if(!v)return;
-    state.pin=v; var err=document.getElementById('gerr');
-    call('load').then(function(d){LS.set('caravan-pin',v);state.data=d;render()}).catch(function(e){state.pin='';render();var er=document.getElementById('gerr');if(er){er.hidden=false;er.textContent=e.message}});
-  });
-}
+function needEdit(next){ if(isEditor()) openSheet(next); else openSheet({type:'editpin',next:next}); }
 
 /* ---------- 操作 ---------- */
 function act(action,payload,msg){
@@ -611,13 +621,13 @@ function bindSheet(ov){
     var b=ev.target.closest('[data-act],[data-leave],[data-open]'); if(!b) return;
     var sh=state.sheet||{};
     if(b.dataset.open){openSheet({type:'detail',id:b.dataset.open});return}
-    if(b.dataset.leave){var nm=b.dataset.leave;act('leave',{eventId:sh.id,name:nm},nm+'さんを外しました').then(function(){render()}).catch(function(e){toast(e.message)});return}
+    if(b.dataset.leave){var nm=b.dataset.leave;act('leave',{eventId:sh.id,name:nm,token:state.tokens[tokenKey(sh.id,nm)]||''},nm+'さんを外しました').then(function(){saveToken(sh.id,nm,'');render()}).catch(function(e){toast(e.message)});return}
     var a=b.dataset.act;
     if(a==='close') closeSheet();
-    else if(a==='edit') openSheet({type:'edit',id:sh.id});
+    else if(a==='edit') needEdit({type:'edit',id:sh.id});
     else if(a==='join') openSheet({type:'join',id:sh.id});
     else if(a==='join-other') openSheet({type:'join',id:sh.id,other:true});
-    else if(a==='leave-me') act('leave',{eventId:sh.id,name:state.me.name},'参加を取り消しました').then(function(){render()}).catch(function(e){toast(e.message)});
+    else if(a==='leave-me') act('leave',{eventId:sh.id,name:state.me.name,token:state.tokens[tokenKey(sh.id,state.me.name)]||''},'参加を取り消しました').then(function(){saveToken(sh.id,state.me.name,'');render()}).catch(function(e){toast(e.message)});
     else if(a==='copy'){var e=(state.data.events||[]).filter(function(x){return x.id===sh.id})[0];var t=lineText(e);
       var fb=function(){var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('コピーしました。LINEに貼り付けてください')}catch(x){toast('コピーできませんでした')}ta.remove()};
       if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function(){toast('コピーしました。LINEに貼り付けてください')},fb); else fb();}
@@ -644,8 +654,15 @@ function bindSheet(ov){
     if(!o){err.hidden=false;err.textContent='名前を選ぶか、入力してください。';return}
     var other=state.sheet.other, id=state.sheet.id, plan=formObj(jf).plan||'';
     if(!other){state.me={name:o.name,group:o.group};LS.set('caravan-me',JSON.stringify(state.me))}
-    act('join',{eventId:id,name:o.name,group:o.group,plan:plan},o.name+'さんを参加で登録しました').then(function(){state.sheet={type:'detail',id:id};render()}).catch(function(e){err.hidden=false;err.textContent=e.message});
+    act('join',{eventId:id,name:o.name,group:o.group,plan:plan},o.name+'さんを参加で登録しました').then(function(d){if(d&&d.token)saveToken(id,o.name,d.token);state.sheet={type:'detail',id:id};render()}).catch(function(e){err.hidden=false;err.textContent=e.message});
   }); }
+  var pf=ov.querySelector('#pf');
+  if(pf) pf.addEventListener('submit',function(ev){ev.preventDefault();var v=pf.pin.value.trim(),err=document.getElementById('perr');if(!v)return;
+    var next=state.sheet.next||null, btn=pf.querySelector('[type=submit]'); btn.disabled=true;
+    setEditPin(v);
+    call('checkEdit').then(function(d){state.data=d;closeSheet();toast('編集できるようになりました');state.sheet=next;render()})
+      .catch(function(e){btn.disabled=false;err.hidden=false;err.textContent=e.message});
+  });
   var mf=ov.querySelector('#mf');
   if(mf){ bindPicker(mf); }
   if(mf) mf.addEventListener('submit',function(ev){ev.preventDefault();var o=pickedName(formObj(mf)),err=document.getElementById('merr');
@@ -661,14 +678,17 @@ app.addEventListener('click',function(ev){
   else if(b.dataset.goto){var d=pd(b.dataset.goto);state.month=new Date(d.getFullYear(),d.getMonth(),1);render()}
   else if(b.dataset.open) openSheet({type:'detail',id:b.dataset.open});
   else if(b.dataset.day){var evs=(state.data.events||[]).filter(function(e){return e.date===b.dataset.day});openSheet(evs.length===1?{type:'detail',id:evs[0].id}:{type:'day',date:b.dataset.day})}
-  else if(b.dataset.act==='add') openSheet({type:'edit',id:null,date:''});
+  else if(b.dataset.act==='add') needEdit({type:'edit',id:null,date:''});
   else if(b.dataset.act==='me') openSheet({type:'me'});
+  else if(b.dataset.act==='editmode') openSheet({type:'editpin'});
+  else if(b.dataset.act==='editoff'){setEditPin('');render();toast('このスマホの編集モードを終了しました')}
 });
 document.addEventListener('keydown',function(ev){if(ev.key==='Escape'&&state.sheet){closeSheet()}});
 
 /* ---------- 起動 ---------- */
-if(state.pin){render();call('load').then(function(d){state.data=d;render()}).catch(function(e){if(state.pin){app.innerHTML='<div class="wrap loading">'+esc(e.message)+'<br><button class="btn" onclick="location.reload()" style="margin-top:12px">再読み込み</button></div>'}})}
-else render();
+LS.del('caravan-pin');
+render();
+call('load').then(function(d){state.data=d;render()}).catch(function(e){app.innerHTML='<div class="wrap loading">'+esc(e.message)+'<br><button class="btn" onclick="location.reload()" style="margin-top:12px">再読み込み</button></div>'});
 })();
 </script>
 </body></html>
