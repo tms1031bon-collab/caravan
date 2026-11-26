@@ -217,7 +217,7 @@ var Mock = (function(){
   var SEED=[];
   var ROSTER=''
     .split(',').map(function(s){var a=s.split(':');return {name:a[0],group:'キャラバン部会',role:a[1]||''}});
-  function seed(){return {settings:{title:'全国リーダーズ研修会さいたま会議',date:''},members:ROSTER.slice(),participants:[],events:SEED.map(function(s,i){return Object.assign({id:'d'+(i+1),updatedBy:'初期登録',updatedAt:''},s)})}}
+  function seed(){return {settings:{title:'第45回リーダーズ研修会「彩り紡ぐさいたま会議」',date:''},members:ROSTER.slice(),participants:[],events:SEED.map(function(s,i){return Object.assign({id:'d'+(i+1),updatedBy:'初期登録',updatedAt:''},s)})}}
   function read(){var s=LS.get(KEY);if(s){try{return JSON.parse(s)}catch(e){}}return seed()}
   function write(d){LS.set(KEY,JSON.stringify(d))}
   function now(){var d=new Date();return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())+' '+p2(d.getHours())+':'+p2(d.getMinutes())}
@@ -287,7 +287,7 @@ function render(){
   html+='<header class="band"><div class="wrap">'
     +'<div class="row"><div><div class="org">さいたまYEG　キャラバン部会</div><h1>キャラバン予定表</h1></div>'
     +'<button class="me-chip" data-act="me">'+(state.me?'👤 '+esc(state.me.name):'👤 自分の名前を設定')+'</button></div>'
-    +'<div class="count"><span class="lbl">'+esc(s.title||'全国リーダーズ研修会さいたま会議')+' まで</span>'
+    +'<div class="count"><span class="lbl">'+esc(s.title||'第45回リーダーズ研修会「彩り紡ぐさいたま会議」')+' まで</span>'
     +'<span class="days num">あと'+(du==null?'◯':du)+'日</span>'
     +'<span class="sub">'+(s.date?esc(jdate(s.date,true))+' 開催':'開催日は調整中')+'</span></div>'
     +'</div></header>';
