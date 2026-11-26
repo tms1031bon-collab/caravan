@@ -116,6 +116,8 @@ main{padding-bottom:24px}
 .none-pill{color:var(--muted);background:var(--surface)}
 .at-box{display:flex;flex-direction:column;gap:8px;margin:16px 0 6px}
 .at-go{display:block;text-align:center;text-decoration:none;color:#fff}
+.at-tip{font-size:12.5px;line-height:1.55;color:var(--muted);background:var(--surface2);border-radius:10px;padding:8px 10px}
+.at-tip b{color:var(--fg)}
 .edit-foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding-block:8px 120px;font-size:13px;color:var(--muted)}
 .edit-foot .btn{color:var(--muted)}
 
@@ -333,7 +335,7 @@ function render(){
   if(state.tab!=='list') state.tab='cal';
   html+='<nav class="tabs"><div class="wrap"><div class="seg" role="tablist">'
     +tabBtn('cal','カレンダー')+tabBtn('list','一覧')+'</div></div></nav>';
-  html+='<main class="wrap"><p class="howto">日付やキャラバンを押すと、E-DESK（AT）のページに進めます。詳細・出欠はATで確認してください。</p>'+(state.tab==='cal'?calView():listView(false))+'</main>';
+  html+='<main class="wrap"><p class="howto">キャラバンを押すと、そのAT（E-DESK）に進めます。詳細・出欠はATで確認・回答してください。</p>'+(state.tab==='cal'?calView():listView(false))+'</main>';
   html+='<footer class="wrap edit-foot">'+(isEditor()
     ?'<span>✏️ このスマホは編集モードです（予定の追加・修正・削除ができます）</span><button class="btn small" data-act="editoff">編集モードを終わる</button>'
     :'<button class="btn small" data-act="editmode">予定を追加・修正する担当者はこちら</button>')+'</footer>';
@@ -435,7 +437,7 @@ function detailView(id){
   h+='<div class="m" style="color:var(--muted);margin-top:4px">📍 '+esc(placeText(e)||'場所は確認中')+'</div>';
   h+='<div class="at-box">'+(at
       ?'<a class="btn go at-go" href="'+esc(at)+'" target="_blank" rel="noopener">E-DESK（AT）で詳細・出欠を見る ↗</a>'
-        +'<div class="foot">集合時間・おすすめの電車・費用・出欠は、すべてATに載っています。開かないときは、E-DESKにログインしてからもう一度押してください。</div>'
+        +'<div class="at-tip"><b>E-DESKのトップ画面になったら</b>：ブラウザでE-DESKにログインしてから、この画面に戻ってもう一度押してください。一度ログインしておけば、次からは直接開きます。</div>'
       :'<div class="none">このキャラバンのATリンクは、まだ登録されていません。E-DESKのスケジュールで確認してください。</div>'
         +'<a class="btn" href="https://edesk.jp/atp4/Dashboard.do" target="_blank" rel="noopener">E-DESKを開く ↗</a>')
     +'</div>';
