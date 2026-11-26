@@ -1,0 +1,633 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#0d4f9c"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style></head><body><title>キャラバン予定表</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap">
+<style>
+/* レイアウト：上に大会カウントダウン帯 → 次のキャラバン → タブ（カレンダー／一覧／自分の予定）→ 下からせり上がる詳細シート */
+:root{
+  --bg:#eef2f7; --surface:#ffffff; --surface2:#f6f8fb; --fg:#13203a; --muted:#5a6579; --line:#d9e0ea;
+  --road:#0d4f9c; --road-fg:#ffffff; --amber:#d9820a; --amber-soft:#fdf0dc;
+  --ok:#177245; --ok-soft:#e2f4ea; --warn:#9a5b00; --warn-soft:#fff2d6; --bad:#b4232c; --bad-soft:#fde5e6;
+  --t-car:#d9820a; --t-shin:#0d4f9c; --t-train:#177245; --t-air:#6a43c9; --t-other:#6b7486;
+  --shadow:0 10px 30px rgba(15,30,60,.18);
+  --f-head:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;
+  --f-body:"BIZ UDPGothic","Hiragino Sans","Yu Gothic","Meiryo",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0c121d; --surface:#151e2e; --surface2:#1b2638; --fg:#e8edf6; --muted:#9ba7bb; --line:#2a3650;
+  --road:#3d82d8; --road-fg:#ffffff; --amber:#f0a73c; --amber-soft:#3a2c14;
+  --ok:#4cc38a; --ok-soft:#173528; --warn:#f0b54a; --warn-soft:#3a2d12; --bad:#f07178; --bad-soft:#3d1a1e;
+  --t-car:#f0a73c; --t-shin:#5b9bec; --t-train:#4cc38a; --t-air:#a68bf0; --t-other:#9ba7bb;
+  --shadow:0 10px 30px rgba(0,0,0,.5); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c121d; --surface:#151e2e; --surface2:#1b2638; --fg:#e8edf6; --muted:#9ba7bb; --line:#2a3650;
+  --road:#3d82d8; --road-fg:#ffffff; --amber:#f0a73c; --amber-soft:#3a2c14;
+  --ok:#4cc38a; --ok-soft:#173528; --warn:#f0b54a; --warn-soft:#3a2d12; --bad:#f07178; --bad-soft:#3d1a1e;
+  --t-car:#f0a73c; --t-shin:#5b9bec; --t-train:#4cc38a; --t-air:#a68bf0; --t-other:#9ba7bb;
+  --shadow:0 10px 30px rgba(0,0,0,.5); color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.6;margin:0;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+.wrap{max-width:760px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.num{font-variant-numeric:tabular-nums}
+
+/* 上の帯（道路標識の青） */
+.band{background:var(--road);color:var(--road-fg);padding-block:14px 18px}
+.band .row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.band .org{font-family:var(--f-head);font-weight:700;font-size:13px;letter-spacing:.08em;opacity:.85}
+.band h1{font-family:var(--f-head);font-weight:900;font-size:22px;margin:2px 0 0;letter-spacing:.02em;text-wrap:balance}
+.me-chip{display:inline-flex;align-items:center;gap:6px;border:1.5px solid rgba(255,255,255,.55);background:rgba(255,255,255,.1);color:var(--road-fg);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700}
+.count{margin-top:12px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;background:rgba(0,0,0,.16);border-radius:10px;padding:10px 12px}
+.count .lbl{font-size:13px;opacity:.9}
+.count .days{font-family:var(--f-head);font-weight:900;font-size:26px;line-height:1}
+.count .sub{font-size:12px;opacity:.8}
+
+/* 次のキャラバン */
+.next{margin-top:-1px;padding-block:14px 4px}
+.next-card{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;width:100%;text-align:left;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:0 2px 0 var(--line)}
+.next-card .eyebrow{font-size:12px;font-weight:700;color:var(--amber);letter-spacing:.06em}
+.next-card .t{font-family:var(--f-head);font-weight:700;font-size:16px;line-height:1.35}
+.next-card .m{font-size:13px;color:var(--muted)}
+.next-card .left{font-family:var(--f-head);font-weight:900;font-size:13px;color:var(--muted);text-align:right;white-space:nowrap}
+.next-card .left b{display:block;font-size:24px;color:var(--fg);line-height:1}
+.datebox{width:54px;text-align:center;border-radius:10px;overflow:hidden;border:1.5px solid var(--line);background:var(--surface2)}
+.datebox .mo{background:var(--amber);color:#fff;font-size:11px;font-weight:700;padding:1px 0}
+.datebox .d{font-family:var(--f-head);font-weight:900;font-size:22px;line-height:1.15;padding-top:2px}
+.datebox .w{font-size:11px;color:var(--muted);padding-bottom:3px}
+
+/* タブ */
+.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:10px}
+.tabs .seg{display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface);border:1.5px solid var(--line);border-radius:12px;padding:4px;gap:4px}
+.tabs button{border:0;background:transparent;border-radius:9px;padding:9px 4px;font-weight:700;font-size:14px;color:var(--muted)}
+.tabs button[aria-selected="true"]{background:var(--road);color:var(--road-fg)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+
+/* カレンダー */
+.cal-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:4px 0 10px}
+.cal-head h2{font-family:var(--f-head);font-weight:900;font-size:20px;margin:0}
+.cal-head h2 small{font-size:12px;color:var(--muted);font-weight:500;margin-left:6px}
+.icon-btn{width:40px;height:40px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);font-size:18px;font-weight:700;display:grid;place-items:center}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.cal .dow{text-align:center;font-size:12px;font-weight:700;color:var(--muted);padding-bottom:2px}
+.cal .dow.sun{color:var(--bad)} .cal .dow.sat{color:var(--road)}
+.day{min-height:64px;border-radius:8px;background:var(--surface);border:1px solid var(--line);padding:3px;display:flex;flex-direction:column;gap:2px;text-align:left;min-width:0}
+.day.out{background:transparent;border-color:transparent}
+.day .n{font-size:12px;font-weight:700;line-height:1.2;padding-left:2px}
+.day.sun .n{color:var(--bad)} .day.sat .n{color:var(--road)}
+.day.today{border:2px solid var(--amber)}
+.day.has{cursor:pointer}
+.chip{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-size:10px;line-height:1.25;font-weight:700;border-radius:4px;padding:2px 3px;color:#fff;overflow:hidden;word-break:break-all;min-width:0}
+.chip.mine{box-shadow:inset 0 0 0 2px #fff}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;margin:10px 0 4px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+
+/* 一覧カード */
+.month-label{font-family:var(--f-head);font-weight:900;font-size:15px;color:var(--muted);margin:18px 2px 8px;letter-spacing:.04em}
+.list{display:flex;flex-direction:column;gap:10px}
+.card{display:grid;grid-template-columns:auto 1fr;gap:12px;width:100%;text-align:left;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:12px;position:relative}
+.card .body{min-width:0;display:flex;flex-direction:column;gap:6px}
+.card .t{font-family:var(--f-head);font-weight:700;font-size:16px;line-height:1.35}
+.card .meta{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:2px 10px}
+.badges{display:flex;flex-wrap:wrap;gap:6px}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;line-height:1.5;border:1.5px solid currentColor}
+.pill.solid{color:#fff;border-color:transparent}
+.st-確定{color:var(--ok);background:var(--ok-soft)}
+.st-確認中{color:var(--warn);background:var(--warn-soft)}
+.st-中止{color:var(--bad);background:var(--bad-soft)}
+.mine-pill{background:var(--amber);color:#fff;border-color:var(--amber)}
+.bar{height:8px;border-radius:99px;background:var(--surface2);border:1px solid var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ok);border-radius:99px}
+.bar-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.bar-row .bar{flex:1}
+.past{opacity:.55}
+.empty{background:var(--surface);border:1.5px dashed var(--line);border-radius:14px;padding:22px 16px;text-align:center;color:var(--muted)}
+
+/* 追加ボタン */
+.fab{position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:20;border:0;background:var(--amber);color:#fff;font-weight:900;font-family:var(--f-head);font-size:15px;border-radius:999px;padding:14px 20px;box-shadow:var(--shadow)}
+main{padding-bottom:110px}
+
+/* シート（下からせり上がる） */
+.ov{position:fixed;inset:0;z-index:30;background:rgba(8,14,26,.5);display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);width:100%;max-width:760px;max-height:92%;overflow:auto;border-radius:18px 18px 0 0;box-shadow:var(--shadow);padding-block:6px calc(28px + env(safe-area-inset-bottom,0px));padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px))}
+.grab{width:44px;height:5px;border-radius:9px;background:var(--line);margin:6px auto 10px}
+.sheet-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.sheet h3{font-family:var(--f-head);font-weight:900;font-size:21px;line-height:1.35;margin:4px 0 6px;text-wrap:balance}
+.close{border:0;background:var(--surface2);width:38px;height:38px;border-radius:50%;font-size:20px;flex:none}
+.sec{border-top:1px solid var(--line);padding-block:14px}
+.sec h4{margin:0 0 10px;font-size:13px;letter-spacing:.08em;color:var(--muted);font-weight:700}
+.kv{display:grid;grid-template-columns:7.5em 1fr;gap:6px 10px;font-size:15px}
+.kv dt{color:var(--muted);font-size:13px;padding-top:2px}
+.kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.big-date{font-family:var(--f-head);font-weight:900;font-size:18px}
+a{color:var(--road)}
+.tl{list-style:none;margin:0;padding:0;position:relative}
+.tl li{display:grid;grid-template-columns:4.2em 18px 1fr;gap:8px;align-items:start;padding-bottom:12px;position:relative}
+.tl li::before{content:"";position:absolute;left:calc(4.2em + 8px + 8px);top:14px;bottom:-2px;width:2px;background:var(--line)}
+.tl li:last-child::before{display:none}
+.tl .tm{font-family:var(--f-head);font-weight:900;font-size:17px;text-align:right;line-height:1.3}
+.tl .dot{width:14px;height:14px;border-radius:50%;margin-top:4px;background:var(--surface);border:3px solid var(--muted);position:relative;z-index:1}
+.tl .dot.key{border-color:var(--amber);background:var(--amber)}
+.tl .what{font-weight:700;line-height:1.4}
+.tl .what small{display:block;font-weight:400;color:var(--muted);font-size:13px}
+.people{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.people h5{margin:0 0 6px;font-size:13px}
+.names{display:flex;flex-wrap:wrap;gap:6px}
+.name{background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:3px 9px;font-size:14px;display:inline-flex;align-items:center;gap:4px}
+.name.me{border-color:var(--amber);background:var(--amber-soft);font-weight:700}
+.name .plan{font-size:11px;font-weight:700;color:var(--road);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:0 5px}
+.name button{border:0;background:transparent;color:var(--muted);padding:0 0 0 2px;font-size:15px;line-height:1}
+.none{color:var(--muted);font-size:13px}
+.target{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+.target b{font-family:var(--f-head);font-weight:900;font-size:26px;line-height:1}
+.target span{color:var(--muted);font-size:13px}
+.cost{display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:15px}
+.cost .v{text-align:right;font-weight:700}
+.cost .k{color:var(--muted);font-size:14px}
+.memo{white-space:pre-wrap;background:var(--surface2);border-radius:10px;padding:10px 12px;font-size:14px}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.btn{border:1.5px solid var(--line);background:var(--surface);border-radius:12px;padding:11px 16px;font-weight:700;font-size:15px}
+.btn.primary{background:var(--road);color:var(--road-fg);border-color:var(--road)}
+.btn.go{background:var(--amber);color:#fff;border-color:var(--amber);flex:1 1 100%;font-size:17px;padding:14px}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.small{padding:8px 12px;font-size:13px}
+.foot{font-size:12px;color:var(--muted);margin-top:4px}
+
+/* フォーム */
+form{display:flex;flex-direction:column;gap:14px}
+fieldset{border:1.5px solid var(--line);border-radius:12px;padding:12px;margin:0;display:flex;flex-direction:column;gap:12px;min-width:0}
+legend{font-weight:700;font-size:13px;color:var(--muted);padding:0 6px;letter-spacing:.06em}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:700;min-width:0}
+label .hint{font-weight:400;color:var(--muted);font-size:12px}
+input,select,textarea{border:1.5px solid var(--line);background:var(--surface2);border-radius:10px;padding:10px 11px;font-size:16px;width:100%;min-width:0}
+textarea{min-height:84px;resize:vertical}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.three{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.radios{display:flex;flex-wrap:wrap;gap:6px}
+.radios label{flex-direction:row;align-items:center;gap:6px;border:1.5px solid var(--line);border-radius:999px;padding:7px 12px;font-weight:700;font-size:14px;background:var(--surface2)}
+.radios input{width:auto;margin:0}
+.radios label:has(input:checked){border-color:var(--road);background:var(--road);color:var(--road-fg)}
+.picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px;max-height:300px;overflow:auto;padding:2px}
+.picker label{position:relative;flex-direction:column;align-items:center;justify-content:center;gap:0;text-align:center;border:1.5px solid var(--line);border-radius:10px;padding:8px 4px;background:var(--surface2);font-size:15px;min-height:46px}
+.picker input{position:absolute;opacity:0;pointer-events:none}
+.picker small{font-weight:400;font-size:10.5px;color:var(--muted);line-height:1.3}
+.picker label:has(input:checked){border-color:var(--amber);background:var(--amber);color:#fff}
+.picker label:has(input:checked) small{color:#fff}
+.picker label:has(input:focus-visible){outline:3px solid var(--amber);outline-offset:2px}
+.err{color:var(--bad);font-weight:700;font-size:14px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:40;background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:700;font-size:14px;box-shadow:var(--shadow);max-width:90%}
+
+/* 合言葉 */
+.gate{min-height:70vh;display:grid;place-items:center;padding-block:40px}
+.gate .box{background:var(--surface);border:1.5px solid var(--line);border-radius:16px;padding:22px 18px;width:100%;max-width:380px;display:flex;flex-direction:column;gap:12px}
+.gate h2{font-family:var(--f-head);font-weight:900;margin:0;font-size:20px}
+.demo-note{background:var(--amber-soft);color:var(--fg);border:1.5px solid var(--amber);border-radius:10px;padding:8px 12px;font-size:13px}
+.loading{padding:40px 0;text-align:center;color:var(--muted)}
+@media (max-width:420px){.people{grid-template-columns:1fr}.three{grid-template-columns:1fr 1fr}}
+@media (prefers-reduced-motion:no-preference){.sheet{animation:up .22s ease-out}@keyframes up{from{transform:translateY(30px);opacity:.6}to{transform:none;opacity:1}}}
+</style>
+
+<div id="app"><div class="loading">読み込み中…</div></div>
+
+<script>
+(function(){
+'use strict';
+var IS_GAS = typeof google !== 'undefined' && google.script && google.script.run;
+var API_URL = (!IS_GAS && /(^|\.)github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname))
+  ? 'https://script.google.com/macros/s/AKfycbzrKHxD14_YUUJGD4xd6OTxwx58YqTOeOU4WB71PysAsnQ0usJtza9n6NDhU9M5fJFq/exec' : '';
+var LIVE = IS_GAS || !!API_URL;
+var LS = {
+  get:function(k){try{return localStorage.getItem(k)}catch(e){return null}},
+  set:function(k,v){try{localStorage.setItem(k,v)}catch(e){}},
+  del:function(k){try{localStorage.removeItem(k)}catch(e){}}
+};
+var TRANSPORTS = ['キャラバンカー','新幹線','在来線・電車','飛行機','各自','未定'];
+var TCOLOR = {'キャラバンカー':'var(--t-car)','新幹線':'var(--t-shin)','在来線・電車':'var(--t-train)','飛行機':'var(--t-air)','各自':'var(--t-other)','未定':'var(--t-other)'};
+var TICON = {'キャラバンカー':'🚐','新幹線':'🚄','在来線・電車':'🚃','飛行機':'✈️','各自':'🚶','未定':'？'};
+var STATUSES = ['確認中','確定','中止'];
+var WD = ['日','月','火','水','木','金','土'];
+
+/* ---------- 見本モード（Googleに載せる前の確認用。この端末の中だけに保存） ---------- */
+var Mock = (function(){
+  var KEY='caravan-demo-v4', PIN='1234';
+  var SEED=[];
+  var ROSTER=''
+    .split(',').map(function(s){var a=s.split(':');return {name:a[0],group:'キャラバン部会',role:a[1]||''}});
+  function seed(){return {settings:{title:'全国リーダーズ研修会さいたま会議',date:''},members:ROSTER.slice(),participants:[],events:SEED.map(function(s,i){return Object.assign({id:'d'+(i+1),updatedBy:'初期登録',updatedAt:''},s)})}}
+  function read(){var s=LS.get(KEY);if(s){try{return JSON.parse(s)}catch(e){}}return seed()}
+  function write(d){LS.set(KEY,JSON.stringify(d))}
+  function now(){var d=new Date();return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())+' '+p2(d.getHours())+':'+p2(d.getMinutes())}
+  return {pin:PIN,api:function(action,pin,p){
+    if(String(pin||'').trim()!==PIN) return {error:'PIN'};
+    var d=read();
+    if(action==='saveEvent'){var e=Object.assign({},p.event);if(!e.date)return{error:'日付を入れてください'};if(!e.title)return{error:'大会名を入れてください'};
+      e.updatedBy=p.by||'名前未設定';e.updatedAt=now();
+      if(e.id){d.events=d.events.map(function(x){return x.id===e.id?e:x})}else{e.id='d'+Date.now();d.events.push(e)}}
+    else if(action==='deleteEvent'){d.events=d.events.filter(function(x){return x.id!==p.id});d.participants=d.participants.filter(function(x){return x.eventId!==p.id})}
+    else if(action==='join'){var known=d.members.filter(function(m){return m.name===p.name})[0];var g=known&&known.group==='キャラバン部会'?'キャラバン部会':p.group;
+      d.participants=d.participants.filter(function(x){return!(x.eventId===p.eventId&&x.name===p.name)});d.participants.push({eventId:p.eventId,name:p.name,group:g,at:now(),plan:p.plan||''});
+      if(!known)d.members.push({name:p.name,group:g,role:''})}
+    else if(action==='leave'){d.participants=d.participants.filter(function(x){return!(x.eventId===p.eventId&&x.name===p.name)})}
+    write(d);return JSON.parse(JSON.stringify(d));
+  }};
+})();
+
+function call(action,payload){
+  return new Promise(function(res,rej){
+    var done=function(r){ if(r&&r.error){ if(r.error==='PIN'){ LS.del('caravan-pin'); state.pin=''; render(); rej(new Error('合言葉が違います')); } else rej(new Error(r.error)); } else res(r); };
+    if(IS_GAS){ google.script.run.withSuccessHandler(done).withFailureHandler(function(e){rej(new Error('通信できませんでした。電波の良い所でもう一度お試しください。'))}).api(action,state.pin,payload||null); }
+    else if(API_URL){ fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:action,pin:state.pin,payload:payload||null})})
+      .then(function(r){return r.json()}).then(done).catch(function(){rej(new Error('通信できませんでした。電波の良い所でもう一度お試しください。'))}); }
+    else setTimeout(function(){done(Mock.api(action,state.pin,payload))},120);
+  });
+}
+
+/* ---------- 状態 ---------- */
+var today=new Date(); today.setHours(0,0,0,0);
+var state={
+  pin:LS.get('caravan-pin')||'',
+  me:(function(){try{return JSON.parse(LS.get('caravan-me')||'null')}catch(e){return null}})(),
+  tab:LS.get('caravan-tab')||'cal',
+  month:new Date(today.getFullYear(),today.getMonth(),1),
+  data:null, sheet:null, busy:false
+};
+
+/* ---------- 小道具 ---------- */
+function p2(n){return(n<10?'0':'')+n}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function pd(s){var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s||'');return m?new Date(+m[1],+m[2]-1,+m[3]):null}
+function ymd(d){return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())}
+function jdate(s,withYear){var d=pd(s);if(!d)return s||'';return (withYear?d.getFullYear()+'年':'')+(d.getMonth()+1)+'月'+d.getDate()+'日('+WD[d.getDay()]+')'}
+function reiwa(y){return y>=2019?'令和'+(y-2018)+'年':''}
+function daysUntil(s){var d=pd(s);if(!d)return null;return Math.round((d-today)/86400000)}
+function lastDay(e){return e.endDate&&e.endDate>e.date?e.endDate:e.date}
+function dateText(e,withYear){if(lastDay(e)===e.date)return jdate(e.date,withYear);var a=pd(e.date),b=pd(e.endDate);return jdate(e.date,withYear)+'〜'+(a.getFullYear()!==b.getFullYear()?jdate(e.endDate,true):jdate(e.endDate))}
+function isPast(e){return daysUntil(lastDay(e))<0}
+var PLANS=['日帰り','前泊','後泊','前泊・後泊','未定'];
+function partsOf(id){return (state.data.participants||[]).filter(function(p){return p.eventId===id})}
+function isMine(id){return !!(state.me&&partsOf(id).some(function(p){return p.name===state.me.name}))}
+function sortedEvents(){return (state.data.events||[]).slice().sort(function(a,b){return (a.date+(a.start||'')).localeCompare(b.date+(b.start||''))})}
+function tcolor(t){return TCOLOR[t]||'var(--t-other)'}
+function toast(msg){var t=document.createElement('div');t.className='toast';t.setAttribute('role','status');t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.remove()},2400)}
+function placeText(e){return [e.venue,e.address].filter(Boolean).join('　')}
+function mapUrl(e){var q=e.address||e.venue;return q?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent([e.venue,e.address].filter(Boolean).join(' ')):''}
+
+/* ---------- 描画 ---------- */
+var app=document.getElementById('app');
+function render(){
+  if(!state.pin){app.innerHTML=gateView();bindGate();return}
+  if(!state.data){app.innerHTML='<div class="loading">読み込み中…</div>';return}
+  var s=state.data.settings||{};
+  var du=daysUntil(s.date);
+  var html='';
+  html+='<header class="band"><div class="wrap">'
+    +'<div class="row"><div><div class="org">さいたまYEG　キャラバン部会</div><h1>キャラバン予定表</h1></div>'
+    +'<button class="me-chip" data-act="me">'+(state.me?'👤 '+esc(state.me.name):'👤 自分の名前を設定')+'</button></div>'
+    +'<div class="count"><span class="lbl">'+esc(s.title||'全国リーダーズ研修会さいたま会議')+' まで</span>'
+    +'<span class="days num">あと'+(du==null?'◯':du)+'日</span>'
+    +'<span class="sub">'+(s.date?esc(jdate(s.date,true))+' 開催':'開催日は調整中')+'</span></div>'
+    +'</div></header>';
+  if(!LIVE) html+='<div class="wrap" style="padding-block:10px 0"><div class="demo-note">これは見本です。ここで入れた内容はこの端末だけに保存され、他の人には見えません。</div></div>';
+  var next=sortedEvents().filter(function(e){return !isPast(e)&&e.status!=='中止'})[0];
+  if(next){
+    var dn=Math.max(0,daysUntil(next.date));
+    html+='<section class="wrap next"><button class="next-card" data-open="'+esc(next.id)+'">'+dateBox(next.date)
+      +'<div style="min-width:0"><div class="eyebrow">次のキャラバン</div><div class="t">'+esc(next.title)+'</div><div class="m">'+esc(placeText(next)||'場所は確認中')+'</div></div>'
+      +'<div class="left">'+(dn===0?'<b>今日</b>':'あと<b class="num">'+dn+'</b>日')+'</div></button></section>';
+  }
+  html+='<nav class="tabs"><div class="wrap"><div class="seg" role="tablist">'
+    +tabBtn('cal','カレンダー')+tabBtn('list','一覧')+tabBtn('mine','自分の予定')+'</div></div></nav>';
+  html+='<main class="wrap">'+(state.tab==='cal'?calView():state.tab==='list'?listView(false):mineView())+'</main>';
+  html+='<button class="fab" data-act="add">＋ キャラバンを追加</button>';
+  app.innerHTML=html;
+  if(state.sheet) openSheet(state.sheet,true);
+}
+function tabBtn(k,l){return '<button role="tab" aria-selected="'+(state.tab===k)+'" data-tab="'+k+'">'+l+'</button>'}
+function dateBox(s){var d=pd(s);if(!d)return '';return '<div class="datebox" aria-hidden="true"><div class="mo">'+(d.getMonth()+1)+'月</div><div class="d num">'+d.getDate()+'</div><div class="w">'+WD[d.getDay()]+'曜</div></div>'}
+
+function calView(){
+  var m=state.month, y=m.getFullYear(), mo=m.getMonth();
+  var first=new Date(y,mo,1), start=new Date(y,mo,1-first.getDay());
+  var byDate={}; sortedEvents().forEach(function(e){var d=pd(e.date),L=lastDay(e),k=0;while(d&&ymd(d)<=L&&k<31){(byDate[ymd(d)]=byDate[ymd(d)]||[]).push(e);d.setDate(d.getDate()+1);k++}});
+  var h='<div class="cal-head"><button class="icon-btn" data-mon="-1" aria-label="前の月">‹</button>'
+    +'<h2>'+y+'年 '+(mo+1)+'月<small>'+reiwa(y)+'</small></h2>'
+    +'<button class="icon-btn" data-mon="1" aria-label="次の月">›</button></div>';
+  h+='<div class="cal">';
+  WD.forEach(function(w,i){h+='<div class="dow'+(i===0?' sun':i===6?' sat':'')+'">'+w+'</div>'});
+  var cnt=0;
+  for(var i=0;i<42;i++){
+    var d=new Date(start.getFullYear(),start.getMonth(),start.getDate()+i);
+    if(i>=35&&d.getMonth()!==mo)break;
+    var key=ymd(d), evs=byDate[key]||[], out=d.getMonth()!==mo;
+    if(!out)cnt+=evs.length;
+    var cls='day'+(out?' out':'')+(d.getDay()===0?' sun':d.getDay()===6?' sat':'')+(+d===+today?' today':'')+(evs.length&&!out?' has':'');
+    if(out){h+='<div class="'+cls+'"></div>';continue}
+    h+='<'+(evs.length?'button data-day="'+key+'"':'div')+' class="'+cls+'"'+(evs.length?' aria-label="'+(d.getMonth()+1)+'月'+d.getDate()+'日 キャラバン'+evs.length+'件"':'')+'><span class="n num">'+d.getDate()+'</span>';
+    evs.slice(0,2).forEach(function(e){h+='<span class="chip'+(isMine(e.id)?' mine':'')+'" style="background:'+tcolor(e.transport)+(e.status==='中止'?';opacity:.45;text-decoration:line-through':'')+'">'+esc(e.title)+'</span>'});
+    if(evs.length>2)h+='<span class="chip" style="background:var(--muted)">他'+(evs.length-2)+'件</span>';
+    h+='</'+(evs.length?'button':'div')+'>';
+  }
+  h+='</div>';
+  h+='<div class="legend">'+TRANSPORTS.slice(0,5).map(function(t){return '<span><i style="background:'+tcolor(t)+'"></i>'+t+'</span>'}).join('')+'<span><i style="background:var(--t-other)"></i>未定</span><span><i style="background:transparent;box-shadow:inset 0 0 0 2px var(--amber)"></i>自分が行く</span></div>';
+  var mS=ymd(new Date(y,mo,1)), mE=ymd(new Date(y,mo+1,0));
+  var evsMonth=sortedEvents().filter(function(e){return e.date<=mE&&lastDay(e)>=mS});
+  h+='<div class="month-label">この月のキャラバン（'+evsMonth.length+'件）</div>';
+  if(evsMonth.length) h+='<div class="list">'+evsMonth.map(card).join('')+'</div>';
+  else{
+    var nx=sortedEvents().filter(function(e){return pd(e.date)>new Date(y,mo+1,0)})[0];
+    h+='<div class="empty">この月のキャラバンはまだ入っていません。'+(nx?'<br><button class="btn small" style="margin-top:10px" data-goto="'+esc(nx.date)+'">次は '+esc(jdate(nx.date,true))+' →</button>':'')+'</div>';
+  }
+  return h;
+}
+function card(e){
+  var ps=partsOf(e.id), tgt=parseInt(e.target,10)||0, past=isPast(e);
+  var tr=e.transport||'未定';
+  var h='<button class="card'+(past?' past':'')+'" data-open="'+esc(e.id)+'">'+dateBox(e.date)+'<div class="body">'
+    +'<div class="badges"><span class="pill st-'+esc(e.status||'確認中')+'">'+esc(e.status||'確認中')+'</span>'
+    +'<span class="pill solid" style="background:'+tcolor(tr)+'">'+TICON[tr]+' '+esc(tr)+'</span>'
+    +(isMine(e.id)?'<span class="pill mine-pill">自分も行く</span>':'')+'</div>'
+    +'<div class="t">'+esc(e.title)+'</div>'
+    +'<div class="meta">'+(lastDay(e)!==e.date?'<span class="num">📅 '+esc(dateText(e))+'</span>':'')+'<span>📍 '+esc(placeText(e)||'場所は確認中')+'</span>'
+    +(e.start?'<span class="num">🕐 '+esc(e.start)+(e.end?'〜'+esc(e.end):'')+'</span>':'')
+    +(tr==='キャラバンカー'&&e.meetTime?'<span class="num">🚐 '+esc(e.meetTime)+' '+esc(e.meetPlace||'')+'集合</span>':'')+'</div>'
+    +'<div class="bar-row"><span class="num">参加 '+ps.length+(tgt?' / 目標'+tgt:'')+'人</span>'+(tgt?'<div class="bar"><i style="width:'+Math.min(100,Math.round(ps.length/tgt*100))+'%"></i></div>':'')+'</div>'
+    +'</div></button>';
+  return h;
+}
+function listView(onlyMine){
+  var evs=sortedEvents();
+  if(onlyMine) evs=evs.filter(function(e){return isMine(e.id)});
+  var up=evs.filter(function(e){return !isPast(e)}), past=evs.filter(isPast);
+  if(!evs.length) return '<div class="empty" style="margin-top:8px">'+(onlyMine?'まだ参加登録しているキャラバンはありません。<br>予定を開いて「行きます」を押すと、ここに並びます。':'キャラバンはまだ登録されていません。<br>右下の「＋ キャラバンを追加」から入れてください。')+'</div>';
+  var h='', last='';
+  up.forEach(function(e){var d=pd(e.date), k=d.getFullYear()+'年'+(d.getMonth()+1)+'月';if(k!==last){h+=(last?'</div>':'')+'<div class="month-label">'+k+'</div><div class="list">';last=k}h+=card(e)});
+  if(last)h+='</div>';
+  if(!up.length)h+='<div class="empty" style="margin-top:8px">これからの予定はありません。</div>';
+  if(past.length)h+='<div class="month-label">終わったキャラバン（'+past.length+'件）</div><div class="list">'+past.reverse().map(card).join('')+'</div>';
+  return h;
+}
+function mineView(){
+  if(!state.me) return '<div class="empty" style="margin-top:8px">自分の名前を設定すると、自分が行くキャラバンだけがここに並びます。<br><button class="btn primary" style="margin-top:12px" data-act="me">名前を設定する</button></div>';
+  return '<div class="foot" style="margin:4px 2px 0">'+esc(state.me.name)+' さんが参加登録しているキャラバン</div>'+listView(true);
+}
+
+/* ---------- 詳細シート ---------- */
+function openSheet(sh,silent){
+  state.sheet=sh;
+  var old=document.querySelector('.ov'); if(old) old.remove();
+  var inner='';
+  if(sh.type==='detail') inner=detailView(sh.id);
+  else if(sh.type==='day') inner=dayView(sh.date);
+  else if(sh.type==='edit') inner=editView(sh.id,sh.date);
+  else if(sh.type==='join') inner=joinView(sh.id);
+  else if(sh.type==='me') inner=meView();
+  else if(sh.type==='del') inner=delView(sh.id);
+  if(!inner){state.sheet=null;return}
+  var ov=document.createElement('div'); ov.className='ov';
+  ov.innerHTML='<div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>'+inner+'</div>';
+  ov.addEventListener('click',function(ev){if(ev.target===ov)closeSheet()});
+  document.body.appendChild(ov);
+  bindSheet(ov);
+  if(!silent){var f=ov.querySelector('h3,input');if(f&&f.focus)try{f.focus({preventScroll:true})}catch(e){}}
+}
+function closeSheet(){state.sheet=null;var o=document.querySelector('.ov');if(o)o.remove()}
+function sheetTop(title,sub){return '<div class="sheet-top"><div style="min-width:0">'+(sub||'')+'<h3 tabindex="-1">'+title+'</h3></div><button class="close" data-act="close" aria-label="閉じる">×</button></div>'}
+
+function detailView(id){
+  var e=(state.data.events||[]).filter(function(x){return x.id===id})[0]; if(!e) return '';
+  var ps=partsOf(id), bu=ps.filter(function(p){return p.group!=='部会以外'}), ot=ps.filter(function(p){return p.group==='部会以外'});
+  var tgt=parseInt(e.target,10)||0, tr=e.transport||'未定', du=daysUntil(e.date), mine=isMine(id);
+  var h=sheetTop(esc(e.title),'<div class="badges" style="margin-top:2px"><span class="pill st-'+esc(e.status||'確認中')+'">'+esc(e.status||'確認中')+'</span><span class="pill solid" style="background:'+tcolor(tr)+'">'+TICON[tr]+' '+esc(tr)+'</span>'+(mine?'<span class="pill mine-pill">自分も行く</span>':'')+'</div>');
+  h+='<div class="big-date">'+esc(dateText(e,true))+(du!=null?' <span style="font-size:14px;color:var(--muted);font-weight:700">'+(du>0?'あと'+du+'日':du===0?'今日':isPast(e)?'終了':'開催中')+'</span>':'')+'</div>';
+  h+='<div class="actions" style="margin:12px 0 14px">'+(mine?'<button class="btn" style="flex:1" data-act="leave-me">行くのをやめる</button>':'<button class="btn go" data-act="join">🙋 行きます</button>')+'</div>';
+  // 場所
+  h+='<div class="sec"><h4>場所・内容</h4><dl class="kv">'
+    +(e.host?'<dt>主催</dt><dd>'+esc(e.host)+'</dd>':'')
+    +'<dt>会場</dt><dd>'+esc(e.venue||'確認中')+'</dd>'
+    +(e.address?'<dt>住所</dt><dd>'+esc(e.address)+(mapUrl(e)?'<br><a href="'+esc(mapUrl(e))+'" target="_blank" rel="noopener">地図で見る ↗</a>':'')+'</dd>':'')
+    +(e.url?'<dt>案内・資料</dt><dd><a href="'+esc(e.url)+'" target="_blank" rel="noopener">開く ↗</a></dd>':'')
+    +'</dl></div>';
+  // タイムライン
+  var tl=[];
+  if(tr==='キャラバンカー'){
+    if(e.meetTime||e.meetPlace) tl.push([e.meetTime,'集合',e.meetPlace,true]);
+    if(e.departTime) tl.push([e.departTime,'出発','キャラバンカーで出発',true]);
+  }
+  if(e.arriveBy) tl.push([e.arriveBy,'会場に到着（この時間までに）',e.venue,false]);
+  if(e.start) tl.push([e.start,'開始',e.end?e.end+' 終了予定':'',false]);
+  if(e.returnTime) tl.push([e.returnTime,'帰着予定','',false]);
+  h+='<div class="sec"><h4>当日の流れ</h4>';
+  if(tl.length) h+='<ol class="tl">'+tl.map(function(r){return '<li><span class="tm num">'+esc(r[0]||'—')+'</span><span class="dot'+(r[3]?' key':'')+'"></span><span class="what">'+esc(r[1])+(r[2]?'<small>'+esc(r[2])+'</small>':'')+'</span></li>'}).join('')+'</ol>';
+  else h+='<div class="none">時間はまだ決まっていません。分かったら「編集」から入れてください。</div>';
+  if(tr==='キャラバンカー'&&!e.meetTime) h+='<div class="none" style="margin-top:6px">キャラバンカーの集合時間・場所は確認中です。</div>';
+  h+='</div>';
+  // 人数
+  h+='<div class="sec"><h4>参加者</h4><div class="target"><b class="num">'+ps.length+'</b><span>人'+(tgt?' ／ 目標 '+tgt+'人'+(ps.length<tgt?'（あと'+(tgt-ps.length)+'人）':'（達成！）'):'')+'</span></div>'
+    +(tgt?'<div class="bar" style="margin-bottom:12px"><i style="width:'+Math.min(100,Math.round(ps.length/tgt*100))+'%"></i></div>':'')
+    +'<div class="people"><div><h5>キャラバン部会（'+bu.length+'）</h5>'+names(bu,id)+'</div><div><h5>部会以外のさいたまYEG（'+ot.length+'）</h5>'+names(ot,id)+'</div></div>'
+    +'<div class="actions"><button class="btn small" data-act="join-other">＋ 他の人を追加</button></div></div>';
+  // お金
+  var costs=[['交通費',e.costTravel],['宿泊費',e.costHotel],['登録料・懇親会費',e.costFee],['その他・お小遣い',e.costOther]].filter(function(c){return c[1]});
+  h+='<div class="sec"><h4>かかるお金（目安）</h4>'+(costs.length?'<div class="cost">'+costs.map(function(c){return '<span class="k">'+c[0]+'</span><span class="v num">'+esc(c[1])+'</span>'}).join('')+'</div>':'<div class="none">まだ決まっていません。</div>')+'</div>';
+  if(e.memo) h+='<div class="sec"><h4>メモ・持ち物</h4><div class="memo">'+esc(e.memo)+'</div></div>';
+  h+='<div class="sec"><div class="actions"><button class="btn primary" data-act="edit">✏️ 編集する</button><button class="btn" data-act="copy">LINE用に文章をコピー</button><a class="btn" href="'+esc(gcalUrl(e))+'" target="_blank" rel="noopener" style="text-decoration:none;color:var(--fg)">📅 Googleカレンダーに入れる</a></div>'
+    +'<div class="foot">最終更新：'+esc(e.updatedBy||'')+' '+esc(e.updatedAt||'')+'</div></div>';
+  return h;
+}
+function names(arr,id){
+  if(!arr.length) return '<div class="none">まだいません</div>';
+  return '<div class="names">'+arr.map(function(p){var me=state.me&&p.name===state.me.name;return '<span class="name'+(me?' me':'')+'">'+esc(p.name)+(p.plan&&p.plan!=='未定'?'<small class="plan">'+esc(p.plan)+'</small>':'')+'<button data-leave="'+esc(p.name)+'" aria-label="'+esc(p.name)+'さんを外す">×</button></span>'}).join('')+'</div>';
+}
+function gcalUrl(e){
+  var d=pd(e.date); if(!d) return '#';
+  var dates;
+  if(e.start&&lastDay(e)===e.date){var s=e.date.replace(/-/g,'')+'T'+e.start.replace(':','')+'00';var en=e.date.replace(/-/g,'')+'T'+(e.end||e.start).replace(':','')+'00';dates=s+'/'+en}
+  else{var n=pd(lastDay(e));n.setDate(n.getDate()+1);dates=e.date.replace(/-/g,'')+'/'+ymd(n).replace(/-/g,'')}
+  var det=lineText(e);
+  return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent('【キャラバン】'+e.title)+'&dates='+dates+'&ctz=Asia/Tokyo&details='+encodeURIComponent(det)+'&location='+encodeURIComponent(placeText(e));
+}
+function lineText(e){
+  var ps=partsOf(e.id), tgt=parseInt(e.target,10)||0, L=[];
+  L.push('【キャラバン】'+e.title+'（'+(e.status||'確認中')+'）');
+  L.push('📅 '+dateText(e,true)+(e.start?' '+e.start+(e.end?'〜'+e.end:''):''));
+  L.push('📍 '+(placeText(e)||'確認中'));
+  if(e.arriveBy)L.push('⏰ '+e.arriveBy+'までに会場着');
+  L.push((TICON[e.transport]||'')+' 移動：'+(e.transport||'未定'));
+  if(e.transport==='キャラバンカー'&&(e.meetTime||e.meetPlace))L.push('　'+(e.meetTime||'')+' '+(e.meetPlace||'')+' 集合'+(e.departTime?'／'+e.departTime+' 出発':''));
+  var c=[['交通費',e.costTravel],['宿泊費',e.costHotel],['登録料・懇親会費',e.costFee],['その他',e.costOther]].filter(function(x){return x[1]});
+  if(c.length)L.push('💴 '+c.map(function(x){return x[0]+' '+x[1]}).join('／'));
+  L.push('🙋 参加 '+ps.length+'人'+(tgt?'（目標'+tgt+'人）':'')+(ps.length?'：'+ps.map(function(p){return p.name+(p.plan&&p.plan!=='未定'?'（'+p.plan+'）':'')}).join('、'):''));
+  if(e.memo)L.push('📝 '+e.memo);
+  return L.join('\n');
+}
+function dayView(date){
+  var evs=sortedEvents().filter(function(e){return e.date===date});
+  return sheetTop(esc(jdate(date,true))+'のキャラバン')+'<div class="list" style="margin-top:8px">'+evs.map(card).join('')+'</div>';
+}
+
+/* ---------- 編集フォーム ---------- */
+function editView(id,date){
+  var e=id?(state.data.events||[]).filter(function(x){return x.id===id})[0]:null;
+  e=e||{status:'確認中',date:date||'',transport:'未定'};
+  function inp(k,label,type,hint,ph){return '<label for="f-'+k+'">'+label+(hint?'<span class="hint">'+hint+'</span>':'')+'<input id="f-'+k+'" name="'+k+'" type="'+(type||'text')+'" value="'+esc(e[k]||'')+'"'+(ph?' placeholder="'+esc(ph)+'"':'')+(type==='number'?' inputmode="numeric" min="0"':'')+'></label>'}
+  var h=sheetTop(id?'キャラバンを編集':'キャラバンを追加');
+  h+='<form id="ef" novalidate>';
+  h+='<fieldset><legend>基本</legend>'
+    +'<div class="radios" role="radiogroup" aria-label="状態">'+STATUSES.map(function(s){return '<label><input type="radio" name="status" value="'+s+'"'+((e.status||'確認中')===s?' checked':'')+'>'+s+'</label>'}).join('')+'</div>'
+    +'<div class="two">'+inp('date','日付 *','date')+inp('endDate','最終日','date','何日間かある場合だけ')+'</div>'
+    +inp('title','大会名・事業名 *','text','','例：〇〇YEG創立〇周年記念式典')
+    +inp('host','主催','text','','例：〇〇商工会議所青年部')
+    +'<div class="two">'+inp('venue','会場名')+inp('address','住所・市町村','text','','例：群馬県伊勢崎市')+'</div>'
+    +inp('url','案内・資料のリンク','url','案内状やホームページのURL（あれば）','https://')
+    +'</fieldset>';
+  h+='<fieldset><legend>時間</legend><div class="three">'+inp('arriveBy','会場到着','time','この時間までに')+inp('start','開始','time')+inp('end','終了','time')+'</div>'
+    +inp('target','目標人数','number','何人行きたいか','例：10')+'</fieldset>';
+  h+='<fieldset><legend>移動</legend><div class="radios" role="radiogroup" aria-label="移動手段">'+TRANSPORTS.map(function(t){return '<label><input type="radio" name="transport" value="'+t+'"'+((e.transport||'未定')===t?' checked':'')+'>'+TICON[t]+' '+t+'</label>'}).join('')+'</div>'
+    +'<div id="carbox"'+(e.transport==='キャラバンカー'?'':' hidden')+' style="display:flex;flex-direction:column;gap:12px">'
+    +inp('meetPlace','集合場所','text','','例：さいたま商工会議所前')
+    +'<div class="three">'+inp('meetTime','集合','time')+inp('departTime','出発','time')+inp('returnTime','帰着予定','time')+'</div></div></fieldset>';
+  h+='<fieldset><legend>かかるお金（目安）</legend><div class="two">'
+    +inp('costTravel','交通費','text','','例：なし（キャラバンカー）')+inp('costHotel','宿泊費','text','','例：なし／約8,000円')
+    +inp('costFee','登録料・懇親会費','text','','例：10,000円')+inp('costOther','その他・お小遣い','text','','例：お小遣い程度')
+    +'</div></fieldset>';
+  h+='<label for="f-memo">メモ・持ち物<textarea id="f-memo" name="memo" placeholder="例：名刺・バッジを忘れずに">'+esc(e.memo||'')+'</textarea></label>';
+  h+='<div class="err" id="ferr" hidden></div>';
+  h+='<div class="actions"><button class="btn primary" type="submit" style="flex:1">保存する</button>'+(id?'<button class="btn danger" type="button" data-act="del">削除</button>':'')+'</div>';
+  h+='</form>';
+  return h;
+}
+function delView(id){
+  var e=(state.data.events||[]).filter(function(x){return x.id===id})[0]; if(!e) return '';
+  return sheetTop('このキャラバンを削除しますか？')+'<p><b>'+esc(e.title)+'</b>（'+esc(jdate(e.date,true))+'）<br>参加登録している人の情報も一緒に消えます。元に戻せません。<br>中止になった場合は、削除せずに状態を「中止」にするのがおすすめです。</p>'
+    +'<div class="actions"><button class="btn danger" data-act="del-yes" style="flex:1">削除する</button><button class="btn" data-act="back-edit" style="flex:1">やめる</button></div>';
+}
+
+/* ---------- 参加登録・自分の名前 ---------- */
+function joinView(id){
+  var e=(state.data.events||[]).filter(function(x){return x.id===id})[0]; if(!e) return '';
+  var other=state.sheet&&state.sheet.other;
+  var nm=other?'':(state.me?state.me.name:''), gp=other?'キャラバン部会':(state.me?state.me.group:'キャラバン部会');
+  return sheetTop(other?'参加する人を追加':'行きます','<div class="foot">'+esc(e.title)+'（'+esc(jdate(e.date))+'）</div>')
+    +'<form id="jf" novalidate>'+nameFields(nm,gp)
+    +'<fieldset><legend>予定</legend><div class="radios" role="radiogroup" aria-label="予定">'+PLANS.map(function(p){return '<label><input type="radio" name="plan" value="'+p+'"'+(p==='未定'?' checked':'')+'>'+p+'</label>'}).join('')+'</div></fieldset>'
+    +(other?'':'<div class="foot">この名前はこの端末に覚えておきます。次から入力は不要です。</div>')
+    +'<div class="err" id="jerr" hidden></div><div class="actions"><button class="btn go" type="submit">参加で登録する</button></div></form>';
+}
+function meView(){
+  return sheetTop('自分の名前')+'<form id="mf" novalidate>'+nameFields(state.me?state.me.name:'',state.me?state.me.group:'キャラバン部会')
+    +'<div class="foot">「自分の予定」タブと、カレンダーの印に使います。この端末だけに保存されます。</div>'
+    +'<div class="err" id="merr" hidden></div><div class="actions"><button class="btn primary" type="submit" style="flex:1">保存する</button></div></form>';
+}
+function roster(){return (state.data.members||[]).filter(function(m){return m.group!=='部会以外'})}
+function nameFields(nm,gp){
+  var ro=roster(), inRo=ro.some(function(m){return m.name===nm});
+  var others=(state.data.members||[]).filter(function(m){return m.group==='部会以外'}).map(function(m){return '<option value="'+esc(m.name)+'">'}).join('');
+  return '<fieldset><legend>キャラバン部会（'+ro.length+'名）から選ぶ</legend><div class="picker" role="radiogroup" aria-label="キャラバン部会メンバー">'
+    +ro.map(function(m,i){return '<label for="pk'+i+'"><input type="radio" id="pk'+i+'" name="pick" value="'+esc(m.name)+'"'+(inRo&&m.name===nm?' checked':'')+'><span>'+esc(m.name)+'</span>'+(m.role?'<small>'+esc(m.role)+'</small>':'')+'</label>'}).join('')
+    +'</div></fieldset>'
+    +'<label for="n-other">部会以外のさいたまYEGメンバーの場合<span class="hint">名前を入力してください（上は選ばなくてOK）</span><input id="n-other" name="other" list="n-list" autocomplete="off" value="'+esc(inRo?'':nm)+'" placeholder="例：山田"></label><datalist id="n-list">'+others+'</datalist>';
+}
+function pickedName(o){
+  if(o.other) return {name:o.other.replace(/さん$/,''),group:'部会以外'};
+  if(o.pick) return {name:o.pick,group:'キャラバン部会'};
+  return null;
+}
+function bindPicker(f){
+  f.addEventListener('change',function(ev){if(ev.target.name==='pick'&&f.other)f.other.value=''});
+  if(f.other) f.other.addEventListener('input',function(){if(f.other.value)Array.prototype.forEach.call(f.querySelectorAll('[name=pick]'),function(r){r.checked=false})});
+}
+
+/* ---------- 合言葉 ---------- */
+function gateView(){
+  return '<div class="wrap gate"><form class="box" id="gf" novalidate><div class="org" style="font-size:13px;color:var(--muted);font-weight:700">さいたまYEG　キャラバン部会</div><h2>キャラバン予定表</h2>'
+    +'<label for="g-pin">合言葉<input id="g-pin" name="pin" inputmode="numeric" autocomplete="off" placeholder="委員会で共有された合言葉"></label>'
+    +(LIVE?'':'<div class="demo-note">見本の合言葉は <b>'+Mock.pin+'</b> です。</div>')
+    +'<div class="err" id="gerr" hidden></div><button class="btn primary" type="submit">開く</button>'
+    +'<div class="foot">一度入れると、この端末では次から入力不要です。</div></form></div>';
+}
+function bindGate(){
+  var f=document.getElementById('gf');
+  f.addEventListener('submit',function(ev){ev.preventDefault();var v=f.pin.value.trim();if(!v)return;
+    state.pin=v; var err=document.getElementById('gerr');
+    call('load').then(function(d){LS.set('caravan-pin',v);state.data=d;render()}).catch(function(e){state.pin='';render();var er=document.getElementById('gerr');if(er){er.hidden=false;er.textContent=e.message}});
+  });
+}
+
+/* ---------- 操作 ---------- */
+function act(action,payload,msg){
+  if(state.busy) return Promise.resolve();
+  state.busy=true;
+  return call(action,payload).then(function(d){state.data=d;state.busy=false;if(msg)toast(msg);return d}).catch(function(e){state.busy=false;throw e});
+}
+function formObj(f){var o={};Array.prototype.forEach.call(f.elements,function(el){if(!el.name)return;if(el.type==='radio'){if(el.checked)o[el.name]=el.value}else o[el.name]=el.value.trim()});return o}
+
+function bindSheet(ov){
+  ov.addEventListener('click',function(ev){
+    var b=ev.target.closest('[data-act],[data-leave],[data-open]'); if(!b) return;
+    var sh=state.sheet||{};
+    if(b.dataset.open){openSheet({type:'detail',id:b.dataset.open});return}
+    if(b.dataset.leave){var nm=b.dataset.leave;act('leave',{eventId:sh.id,name:nm},nm+'さんを外しました').then(function(){render()}).catch(function(e){toast(e.message)});return}
+    var a=b.dataset.act;
+    if(a==='close') closeSheet();
+    else if(a==='edit') openSheet({type:'edit',id:sh.id});
+    else if(a==='join') openSheet({type:'join',id:sh.id});
+    else if(a==='join-other') openSheet({type:'join',id:sh.id,other:true});
+    else if(a==='leave-me') act('leave',{eventId:sh.id,name:state.me.name},'参加を取り消しました').then(function(){render()}).catch(function(e){toast(e.message)});
+    else if(a==='copy'){var e=(state.data.events||[]).filter(function(x){return x.id===sh.id})[0];var t=lineText(e);
+      var fb=function(){var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('コピーしました。LINEに貼り付けてください')}catch(x){toast('コピーできませんでした')}ta.remove()};
+      if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function(){toast('コピーしました。LINEに貼り付けてください')},fb); else fb();}
+    else if(a==='del') openSheet({type:'del',id:sh.id});
+    else if(a==='back-edit') openSheet({type:'edit',id:sh.id});
+    else if(a==='del-yes') act('deleteEvent',{id:sh.id},'削除しました').then(function(){state.sheet=null;render()}).catch(function(e){toast(e.message)});
+  });
+  var ef=ov.querySelector('#ef');
+  if(ef){
+    ef.addEventListener('change',function(ev){if(ev.target.name==='transport')document.getElementById('carbox').hidden=ev.target.value!=='キャラバンカー'});
+    ef.addEventListener('submit',function(ev){ev.preventDefault();var o=formObj(ef),err=document.getElementById('ferr');
+      if(!o.date||!o.title){err.hidden=false;err.textContent='日付と大会名は必ず入れてください。';return}
+      if(state.sheet.id)o.id=state.sheet.id;
+      var btn=ef.querySelector('[type=submit]');btn.disabled=true;btn.textContent='保存中…';
+      act('saveEvent',{event:o,by:state.me?state.me.name:''},'保存しました').then(function(d){
+        var saved=sortedEvents().filter(function(x){return o.id?x.id===o.id:(x.date===o.date&&x.title===o.title)}).pop();
+        var dd=pd(o.date);if(dd)state.month=new Date(dd.getFullYear(),dd.getMonth(),1);
+        state.sheet=saved?{type:'detail',id:saved.id}:null;render();
+      }).catch(function(e){btn.disabled=false;btn.textContent='保存する';err.hidden=false;err.textContent=e.message});
+    });
+  }
+  var jf=ov.querySelector('#jf');
+  if(jf){ bindPicker(jf); jf.addEventListener('submit',function(ev){ev.preventDefault();var o=pickedName(formObj(jf)),err=document.getElementById('jerr');
+    if(!o){err.hidden=false;err.textContent='名前を選ぶか、入力してください。';return}
+    var other=state.sheet.other, id=state.sheet.id, plan=formObj(jf).plan||'';
+    if(!other){state.me={name:o.name,group:o.group};LS.set('caravan-me',JSON.stringify(state.me))}
+    act('join',{eventId:id,name:o.name,group:o.group,plan:plan},o.name+'さんを参加で登録しました').then(function(){state.sheet={type:'detail',id:id};render()}).catch(function(e){err.hidden=false;err.textContent=e.message});
+  }); }
+  var mf=ov.querySelector('#mf');
+  if(mf){ bindPicker(mf); }
+  if(mf) mf.addEventListener('submit',function(ev){ev.preventDefault();var o=pickedName(formObj(mf)),err=document.getElementById('merr');
+    if(!o){err.hidden=false;err.textContent='名前を選ぶか、入力してください。';return}
+    state.me={name:o.name,group:o.group};LS.set('caravan-me',JSON.stringify(state.me));state.sheet=null;render();toast('名前を保存しました');
+  });
+}
+
+app.addEventListener('click',function(ev){
+  var b=ev.target.closest('[data-tab],[data-mon],[data-open],[data-day],[data-act],[data-goto]'); if(!b||b.closest('.ov')) return;
+  if(b.dataset.tab){state.tab=b.dataset.tab;LS.set('caravan-tab',state.tab);render()}
+  else if(b.dataset.mon){state.month=new Date(state.month.getFullYear(),state.month.getMonth()+(+b.dataset.mon),1);render()}
+  else if(b.dataset.goto){var d=pd(b.dataset.goto);state.month=new Date(d.getFullYear(),d.getMonth(),1);render()}
+  else if(b.dataset.open) openSheet({type:'detail',id:b.dataset.open});
+  else if(b.dataset.day){var evs=(state.data.events||[]).filter(function(e){return e.date===b.dataset.day});openSheet(evs.length===1?{type:'detail',id:evs[0].id}:{type:'day',date:b.dataset.day})}
+  else if(b.dataset.act==='add') openSheet({type:'edit',id:null,date:''});
+  else if(b.dataset.act==='me') openSheet({type:'me'});
+});
+document.addEventListener('keydown',function(ev){if(ev.key==='Escape'&&state.sheet){closeSheet()}});
+
+/* ---------- 起動 ---------- */
+if(state.pin){render();call('load').then(function(d){state.data=d;render()}).catch(function(e){if(state.pin){app.innerHTML='<div class="wrap loading">'+esc(e.message)+'<br><button class="btn" onclick="location.reload()" style="margin-top:12px">再読み込み</button></div>'}})}
+else render();
+})();
+</script>
+</body></html>
